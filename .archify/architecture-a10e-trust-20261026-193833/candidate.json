@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Galaxy A10e: who checks whom at boot",
+    "output": ".archify/architecture-a10e-trust-20261026-193833/a10e-trust.html",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "legend": {
+      "entries": {
+        "security": { "label": "gatekeeper: checks signatures" },
+        "backend": { "label": "signed Android piece" },
+        "database": { "label": "stored data, never signed" },
+        "external": { "label": "outside the chain" }
+      }
+    }
+  },
+  "components": [
+    { "id": "pc", "type": "external", "label": "Your PC", "sublabel": "samloader or Odin", "pos": [300, 40], "size": [140, 60] },
+    { "id": "rom", "type": "security", "label": "Boot ROM", "sublabel": "baked into the chip", "pos": [40, 200], "size": [130, 64] },
+    { "id": "sboot", "type": "security", "label": "Bootloader", "sublabel": "sboot.bin", "pos": [300, 200], "size": [140, 64], "tag": "locked" },
+    { "id": "cm", "type": "security", "label": "Crypto Manager", "sublabel": "cm.bin, secure side", "pos": [300, 370], "size": [140, 64] },
+    { "id": "vbmeta", "type": "security", "label": "vbmeta", "sublabel": "signed list, RSA-4096", "pos": [570, 200], "size": [150, 64] },
+    { "id": "chained", "type": "backend", "label": "Chained images", "sublabel": "recovery, dtb, dtbo, product", "pos": [560, 370], "size": [170, 64] },
+    { "id": "boot", "type": "backend", "label": "Kernel", "sublabel": "boot.img", "pos": [825, 200], "size": [130, 64] },
+    { "id": "system", "type": "backend", "label": "Android", "sublabel": "system.img", "pos": [1050, 110], "size": [150, 64] },
+    { "id": "vendor", "type": "backend", "label": "Samsung drivers", "sublabel": "vendor.img", "pos": [1050, 290], "size": [150, 64] },
+    { "id": "userdata", "type": "database", "label": "Your apps + files", "sublabel": "userdata, cache", "pos": [40, 540], "size": [170, 64] },
+    { "id": "efs", "type": "database", "label": "Phone identity", "sublabel": "EFS: IMEI, radio", "pos": [300, 540], "size": [170, 64] },
+    { "id": "modem", "type": "external", "label": "Cell modem", "sublabel": "modem.bin, own CPU", "pos": [560, 540], "size": [170, 64], "tag": "check: unknown" },
+    { "id": "param", "type": "external", "label": "Boot screens", "sublabel": "param.bin pictures", "pos": [820, 540], "size": [170, 64], "tag": "check: unknown" }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Your PC: never trusted", "wraps": ["pc"], "pad": 14 },
+    { "kind": "security-group", "label": "Samsung's locked core", "wraps": ["rom", "sboot", "cm"], "pad": 18 },
+    { "kind": "security-group", "label": "Checked every boot", "wraps": ["vbmeta", "chained", "boot", "system", "vendor"], "pad": 18 },
+    { "kind": "region", "label": "Not on vbmeta's list", "wraps": ["userdata", "efs", "modem", "param"], "pad": 18 }
+  ],
+  "connections": [
+    { "from": "rom", "to": "sboot", "label": "checks signature", "variant": "security" },
+    { "from": "pc", "to": "sboot", "label": "flash: Samsung-signed only", "variant": "security" },
+    { "from": "sboot", "to": "cm", "label": "keys + lock state" },
+    { "from": "sboot", "to": "vbmeta", "label": "checks signature", "variant": "security" },
+    { "from": "vbmeta", "to": "chained", "label": "own key each", "variant": "security" },
+    { "from": "vbmeta", "to": "boot", "label": "SHA-256 hash", "variant": "security" },
+    { "from": "boot", "to": "system", "label": "dm-verity", "variant": "emphasis", "route": "orthogonal-h" },
+    { "from": "boot", "to": "vendor", "label": "dm-verity", "variant": "emphasis", "route": "orthogonal-h" }
+  ],
+  "cards": [
+    { "dot": "violet", "title": "ELI5: a chain of ID checks", "items": ["The chip only trusts Samsung's bootloader", "The bootloader only trusts a Samsung-signed vbmeta", "vbmeta holds a fingerprint for each Android piece", "A piece with the wrong fingerprint doesn't boot"] },
+    { "dot": "rose", "title": "Why a GSI or custom kernel fails", "items": ["It changes system or boot, so the fingerprint stops matching", "A new vbmeta would need Samsung's private key", "Unlocking would let the bootloader accept it, and this phone can't unlock"] },
+    { "dot": "emerald", "title": "Read from the files tonight", "items": ["vbmeta: RSA-4096; hashes bootloader, cm, boot; dm-verity for system, vendor; 4 chained", "sboot text: 'Custom binary blocked', 'KG locked', avb_slot_verify.c", "cm.bin: CryptoManagerV40, mostly empty, the rest scrambled"] },
+    { "dot": "slate", "title": "General knowledge or unknown", "items": ["Boot ROM checking sboot: general knowledge, not in the files", "Kernel enforcing dm-verity as it reads: general knowledge", "Whether the modem and boot screens get checked: unknown"] }
+  ]
+}

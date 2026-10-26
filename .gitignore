@@ -1,1 +1,4 @@
 /out/
+/.archify/*/visual-check/
+/.archify/*/*.out
+/.archify/*/*.*.json

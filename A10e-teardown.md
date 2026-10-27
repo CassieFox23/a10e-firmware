@@ -4,17 +4,17 @@ A hobby reverse-engineering walkthrough of the stock firmware for the **Samsung 
 
 Everything here is static analysis of firmware downloaded from Samsung's own update servers. Nothing was flashed, nothing was run on the phone, and no lock was bypassed — the opposite, really: the point was to read the locks and understand them.
 
+> **Correction, 2026-10-26.** An earlier version of this guide described a second flash lock built on a "Knox Guard token magic `0x12349876`." That was wrong. The cause was an ARM64 addressing bug (wrong `ADRP` page phase) that resolved string references to their neighbours. `0x12349876` is the Samsung **PIT** (partition table) magic, and the code in question is the partition-table parser. A blind second-pass review and an independent session both caught it on primary evidence. The method section below now walks through the bug, because it is the most useful thing in here.
+
 ---
 
 ## TL;DR
 
 - The A10e is Project-Treble compliant, but its bootloader can't be unlocked, so no GSI or custom kernel can ever boot on it.
 - Its stock firmware is six bundles that map onto 38 phone partitions; 21 of them (radio identity, keys, factory-reset protection) are never touched by a flash, which is why a reflash keeps the phone's IMEI.
-- The phone has **three independent locks**, and I read each one in the actual code:
-  1. **Verified boot (AVB):** the bootloader refuses to run any boot/system image not signed by a 4096-bit RSA key fused to the device.
-  2. **Knox Guard / KG:** in Download mode, the flasher refuses any payload without a signed engineering token.
-  3. **TEEGRIS secure world:** a TrustZone OS holds a `bl_secure_info` structure that tracks every lock bit; normal code can read it but can't forge it.
-- The fun part was method: the bootloader is a headless ARM64 blob with no symbols, so standard tools stalled. I'll show why, and the trick that got around it.
+- The one lock that actually blocks a custom ROM is **verified boot (AVB)**: the bootloader refuses to run any boot/system image not signed by a 4096-bit RSA key. I carved the key out, confirmed its fingerprint with `avbtool`, and read the check in the bootloader's own code.
+- There are two other locks, read with less certainty: **Knox Guard** (a carrier/financing flash gate — real, but a `kg_state` handler, *not* the token check I first wrote) and the **TEEGRIS** secure world (a TrustZone OS that holds the secure status bits normal code can read but not change).
+- The fun part is the method, and the mistake: the bootloader is a headless ARM64 blob, and a wrong assumption about `ADRP` addressing silently fooled me. That story is the main event.
 
 ---
 
@@ -24,7 +24,7 @@ Everything here is static analysis of firmware downloaded from Samsung's own upd
 |---|---|
 | Model | SM-A102U (T-Mobile / US carrier) |
 | Build | `A102USQSDAVD1` — bootloader v13, Android 9, April 2022, patch 2022-01-01 |
-| SoC | Exynos 7885-class (the firmware strings also say 7904/7885 in different places) |
+| SoC | Exynos 7885-class (strings in the firmware say `exynos7885` and `7904`; some third-party sources list Exynos 7884 — I didn't resolve the discrepancy) |
 | Treble | yes (`ro.treble.enabled=true`, VNDK 28) |
 | GSI flavour | `a64_bvN` (32-bit apps, 64-bit binder, system-as-root, vanilla) |
 | Bootloader | **locked, no OEM-unlock toggle** — the wall for custom ROMs |
@@ -50,94 +50,94 @@ The PIT (partition table) lists 38 partitions. Only 17 are written by this firmw
 
 ---
 
-## Lock #1 — Verified boot (AVB)
+## Lock #1 — Verified boot (AVB)  *(the one that matters)*
 
 `vbmeta` is Android's signed "table of contents" for the boot chain. Reading it with `avbtool` and carving the embedded key out by hand:
 
 - Algorithm: **SHA256_RSA4096** (a 4096-bit RSA key).
+- Key fingerprint (sha1): `e553992a79ab561a4805371cce123d1ee73db21b` (confirmed against `avbtool`, and recomputed by hand over the 1032-byte key blob).
 - The same key signs the `vbmeta` root **and** every chained partition (`recovery`, `dtb`, `dtbo`, `product`).
 - It carries SHA-256 hashes for `bootloader`, `cm` and `boot`, plus **dm-verity** hash trees (with FEC) for `system` and `vendor`.
+- The bootloader carries a byte-identical copy of that public key inside itself, in two places (file offsets `0x12b070` and `0x322410`) — so the key is *embedded in the bootloader*, not something I could show is blown into a hardware fuse.
 
 That key is *the* thing an image has to be signed with. Change `system` or `boot` — as a GSI or custom kernel does — and its hash no longer matches `vbmeta`, and `vbmeta` itself can't be re-signed without Samsung's private key.
 
-I then found the code that enforces it, inside the bootloader. It's **libavb** (the standard Android Verified Boot library) compiled in. The core gate, disassembled:
+I then found the code that enforces it, inside the bootloader. It's **libavb** (the standard Android Verified Boot library) compiled in. The gate is an indirect call to a key validator, followed by a flag test:
 
 ```
-bl   <validate_public_key>      ; is the key this image was signed with one we trust?
-cbnz w0, <continue>             ; trusted -> keep going
-...  "Public key used to sign data rejected. (%d)"
-mov  w21, #6                    ; result = rejected
-bl   <log>                      ; and boot fails
+blr  x8                     ; call the public-key validator (x8 from an ops struct)
+cmp  w0, #1
+cbnz w0, <error path>
+ldrb w0, [x29, #0x4c0]      ; the "key accepted" flag it sets
+cbz  w0, <reject>           ; not accepted -> reject
+...  "%s: Public key used to sign data rejected. (%d)"
 ```
 
-Four lines, and that's the whole idea: validate the signing key, and if it isn't the device's own key, reject and stop.
+If the key an image was signed with isn't the device's trusted key, it logs "Public key used to sign data rejected" and boot fails. That is the whole idea, and it's the real reason an unsigned GSI or custom kernel is refused.
 
 ---
 
-## Lock #2 — Knox Guard (the flash gate)
+## Lock #2 — Knox Guard (the flash gate)  *(real, but read this correction)*
 
-Separately from verified boot, the bootloader's **Download mode** (the Odin flashing screen) has its own gate. Its strings tell the story: `"KG locked. Not allowed to flash."`, `"KG locked but allow to flash with eng token"`, and `"blocked due to remaining installment balance"`. KG is **Knox Guard** — Samsung's carrier/financing lock (the "this phone isn't paid off" case is literally in there).
+Separately from verified boot, the bootloader's **Download mode** (the Odin flashing screen) has a carrier/financing gate. Its strings are blunt: `"KG locked. Not allowed to flash."`, `"custom binary! kernel rp skip checking.."`, and `"blocked due to remaining installment balance"`. KG is **Knox Guard** — the "this phone isn't paid off / is carrier-locked" case is literally in there.
 
-The decision, read directly from the disassembly:
+**What I got wrong the first time:** I reported this gate as a check for a "token magic `0x12349876`", with a tidy four-line disassembly. That was a mistake caused by the addressing bug in the method section. The function I pointed at is actually the **PIT (partition-table) parser**: it copies a 28-byte header, checks the magic `0x12349876` (which is the identifier at the top of every Samsung PIT file — see Heimdall's `libpit`), caps the entry count at 128, and loops over 132-byte entries. It has nothing to do with Knox Guard.
 
-```
-w0 = 0x12349876               ; a token "magic" value
-w1 = <field from the flash payload you send>
-if w1 != 0x12349876 -> "...not allowed to be flashed due to KG locked", return -1   (REFUSE)
-else                -> take the "allow to flash with eng token" branch
-```
-
-On a KG-locked phone, whatever you try to flash has to carry an engineering token stamped with the magic `0x12349876`. No token, instant refusal. Important caveat: that magic is only the token's *format tag* — a real token is signed and validated further down (Samsung-internal; you can't forge one). The magic alone unlocks nothing.
+**What the real gate does**, once the addressing is correct: the KG handler (around file offset `0x6f8b8`) reads a `kg_state`, tests a flag bit through a helper, and — when locked — allows only a partition named `STEADY` through (`"KG locked. but allowed to flash steady."`). Anything else is refused with `"KG locked. Not allowed to flash."` / `"All binaries are not allowed to be flashed due to KG locked.(%s)"`. The decision is a state-and-partition check, logged as `[kg_state] %s but this is %s`. I did **not** find a signed-token mechanism here; what the flag bit ultimately comes from is unverified.
 
 ---
 
 ## Lock #3 — the TEEGRIS secure world
 
-Buried inside the bootloader are three small ARM64 ELF programs tagged `TEEGRIS` — Samsung's TrustZone secure OS. Because they're proper ELF files (with headers and sections), they decompile cleanly, unlike the headerless bootloader itself.
+Buried inside the bootloader are three small ARM64 ELF programs. Because they're proper ELF files (with headers and sections), they decompile cleanly, unlike the headerless bootloader itself.
 
-- One is the **secure-OS loader** (`load_startup_tzar`, `startup.tzar.lz4`, `SECUREOS VERSION`), which unpacks the TrustZone OS at boot.
-- The most interesting one reports Samsung's **`bl_secure_info`** structure. Its strings name every lock bit the secure world tracks:
-  - `cc_mode` — the "Custom binary blocked by CC Mode" state
-  - `em_status` / `em_token` — engineering mode and the KG engineering token
-  - `curr_bin_status` — Samsung Official vs. custom binary
-  - `frp_lock` — factory-reset protection
-  - `kernel_rp` — kernel rollback protection
-  - plus `afw_value`, `ap_serial`, `image_status[]`, `kap_status`
+- Two of them are preceded by the tag `TEEGRIS_EXYNOS7904_CSMC` — Samsung's TrustZone secure OS (TEEGRIS) and its Crypto Manager helper.
+- The third is **not** tagged TEEGRIS; it's preceded by `bin/startup_loader` and is the **secure-OS loader** by content (`load_startup_tzar`, `startup.tzar.lz4`, `SECUREOS VERSION`), which unpacks the TrustZone OS at boot.
+- One module prints Samsung's **`bl_secure_info`** fields as debug lines (`CSMC: bl_secure_info.<field>`). The fields it names include `cc_mode`, `em_status`/`em_token`, `curr_bin_status`, `frp_lock`, `kernel_rp` — and more besides (`rp_ver`, `system_rp`, `sec_boot`, `warranty_bit`, `image_status[]`, and others). So this is a secure-world module that *reports* a long list of status/lock bits; it's a readout, not the authority that sets them.
 
-That single structure is where all three locks meet. The normal-world bootloader *reads* these bits to decide what it'll run and flash, but the values live in the secure world where normal code can't change them.
-
-**Putting it together:** the phone won't *run* unsigned images (AVB), won't *flash* without a signed token (KG), and the state behind both is held in a place you can't reach (TEEGRIS). Three layers, each independent. That's why a US-carrier A10e is a wall.
+**Putting it together:** the phone won't *run* unsigned images (AVB — the hard wall), won't *flash* freely once carrier/financing-locked (KG), and the state behind both lives in the secure world (TEEGRIS) where normal code can read but not change it. AVB is the one I read with full confidence; the other two I read with the caveats above.
 
 ---
 
-## How it was done — the method (the fun part)
+## How it was done — the method (the fun part, and the mistake)
 
-The bootloader (`sboot.bin`) is a 4 MB headless ARM64 image: no file header, no symbols, no entry point. Opening it in Ghidra was where it got interesting.
+The bootloader (`sboot.bin`) is a 4 MB ARM64 image with no symbols and no obvious load address. It *does* begin with a small 16-byte header (word `0x00000010`, then the magic `0xfdcdbc1d`) followed by a reset-style stub at offset `0x10` — which matters below.
 
-**1. Ghidra stalled, and the error was the clue.** Loaded raw at a guessed base, auto-analysis found 3,301 functions but couldn't tie the "blocked" strings to any code — every cross-reference came back empty, and the "entry point" decompiled to a single garbage instruction. The reason: with no valid entry to seed from, the disassembler never covered the code that's only reached through function pointers.
+**1. Ghidra stalled, and the first diagnosis was half-right.** Loaded raw at a guessed base, auto-analysis found thousands of functions but couldn't tie the "blocked"/"rejected" strings to any code — cross-references came back empty, and the "entry point" at offset 0 decoded as a single garbage instruction. Part of that is real (code reached only through function pointers stays undisassembled). Part of it was self-inflicted: offset 0 is the *header*, not code, so seeding the entry there was always going to produce garbage. The real entry stub is at `0x10`.
 
-**2. Hunting the "real load base" — and the clue I almost threw away.** The natural next step is "find the address this image is meant to load at." I tried matching the file's absolute 64-bit pointers to string starts, to function prologues, to literal-pool entries, and to MOVZ/MOVK-built constants — every method smeared across many candidates with no sharp winner. I also found a tight cluster of pointers sitting around `0x8f000000`, and because they didn't land on function starts I wrote them off as runtime RAM buffers. That was the mistake.
+**2. The bug that actually bit me: the `ADRP` page phase.** ARM64 finds its own data with an `ADRP`+`ADD` pair. `ADRP` is **page**-relative: it forms `(PC & ~0xFFF) + offset`. To compute which byte a reference lands on, you need the load address **modulo 4 KB** — the "page phase". Not the whole base. Just the low 12 bits.
 
-That cluster *is* the base. There are **834** absolute pointers in it; they start at exactly `0x8f000000` and span the whole 4 MB image (the lowest is base+0, the highest base+`0x3d0988`). A pile of self-pointers that begins at an address and reaches across the entire file only lines up for one base — so the base is `0x8f000000` (it also matches Samsung's documented Exynos sboot address).
+I assumed the phase was 0 (a 4 KB-aligned base, file offset mapping straight onto a page boundary). For this image it's `0x800` — half a page. With the wrong phase, *every* string reference lands ~`0x800` bytes off, typically on the neighbouring string. The disassembly still looks fine; the references just point at the wrong text. It fails silently.
 
-The separate lesson, and the one that actually got the code read: **ARM64 is mostly position-relative.** It finds its own strings and functions with `ADRP+ADD` ("jump this far from *here*"), which reads the same no matter where you load it. So to *read the logic* you don't need the base at all — which is why Ghidra's wrong guessed base still decompiled the relative code fine, and why the next trick works straight off the raw bytes.
+The right way to find the phase is to measure it: for each candidate phase, count how many `ADRP`+`ADD` pairs resolve exactly to the start of a C string. One phase wins sharply.
 
-**3. The trick: find the reference in the raw bytes.** Since `ADRP+ADD` is position-independent, I wrote a tiny scanner that decodes those instruction pairs straight from the file and computes which string each one points at. That found the exact instruction that builds the address of the verified-boot error message — which pinned the function Ghidra had skipped. From there, `capstone` disassembled it directly. Same scanner found the Knox Guard gate a few hundred bytes away.
+| Page phase | `ADRP`+`ADD` pairs landing on a clean string start |
+|---|---|
+| `0x800` (correct) | 3209 |
+| `0` (my wrong assumption) | 900 |
 
-**4. Carve the clean bits out.** The TEEGRIS programs are real ELF files embedded mid-binary. Parsing their ELF headers to get their exact size and carving them to standalone files gave Ghidra something with symbols and sections — and suddenly cross-references, function boundaries and decompilation all worked normally. A good reminder that the right move is often to *reshape the input* rather than fight the tool.
+(An independent session reproduced this on a live Ghidra session: ~4249 of 6462 pairs clean at `0x800` vs ~1000 at phase 0, with phase-0 hits landing on mid-token junk.)
+
+**3. What the bug cost, and what fixing it revealed.** Under the wrong phase, the partition-table parser's `0x12349876` magic check lined up (by near-miss) with Knox Guard strings, and I wrote it up as a KG token gate. Under the correct `0x800` phase, that site cleanly references `pit_check_integrity` / `update_guid_partition_table`, and the *real* AVB key gate (file `0xa7a34`) and KG handler (file `0x6f8b8`) resolve to their own, correct strings — the ones quoted in the locks above.
+
+**4. On the "load base".** Because the phase is `0x800` and not `0`, the image does **not** sit at a clean 4 KB-aligned base like `0x8f000000` (an earlier claim I've retracted — the "pointer cluster" that suggested it leans on the file's zero padding, and the two pointers at base+0 are just `ldr`/`br` jump constants in a startup stub). The full base isn't pinned, and it doesn't need to be: the page phase is all you need to resolve references. File offsets are the stable reference throughout this writeup.
+
+**5. Carve the clean bits out.** The TEEGRIS programs are real ELF files embedded mid-binary. Parsing their ELF headers to get their exact size and carving them to standalone files gave the tools something with symbols and sections — and cross-references, function boundaries and decompilation all worked normally. The right move is often to *reshape the input* rather than fight the tool.
 
 **Takeaways for anyone poking at firmware:**
+- `ADRP` is **page**-relative. To resolve a reference you need the load address mod 4 KB. Don't assume it's zero — measure it (the phase with the most references landing on clean string starts wins).
+- A wrong page phase fails *silently*: everything disassembles, references just point at neighbouring data. That's how a partition-table check got written up as a carrier lock.
+- You don't need the full load base to read logic; the page phase is enough. Don't trust a pointer cluster as a base.
 - An empty cross-reference list in a raw image usually means "not disassembled," not "not referenced."
-- For ARM64, you don't need a load base to read logic — `ADRP+ADD` is base-independent; scan for it directly.
-- But the base is recoverable: a self-pointer cluster that starts at one address and spans the whole image *is* the base — don't write it off as RAM buffers (the mistake I nearly made).
-- If part of a blob is a real container/ELF, extract it and let the tools do their job on headers they understand.
+- If part of a blob is a real container/ELF, extract it and let the tools work on headers they understand.
+- Get a second, blind pass before you trust your own writeup. Mine invented a lock that wasn't there.
 
 ---
 
 ## Tools
 
-All free and local: Samsung's own firmware via `samloader`; `lz4`, `simg2img`, `debugfs`, `avbtool` for unpacking; Ghidra (via REA) and `capstone` for disassembly; `binwalk` for a first pass; small Python scripts for the ADRP/base work (in `tools/sboot/`). No device was connected and nothing was flashed.
+All free and local: Samsung's own firmware via `samloader`; `lz4`, `simg2img`, `debugfs`, `avbtool` for unpacking; Ghidra (via REA) for analysis, plus `capstone` (driven through a tiny `ctypes` wrapper, since the Python bindings aren't installed here) for the byte-level disassembly and the phase sweep; `binwalk` for a first pass; small Python scripts for the `ADRP` reference work. No device was connected and nothing was flashed.
 
 ## Reproducing
 
-The `tools/` scripts regenerate the maps and disassembly from the firmware in `firmware/`. Derived artifacts (boot screens, carved ELFs, the extracted key) land in `out/` and aren't committed, since they rebuild from the bundles.
+The `tools/` scripts regenerate the maps and disassembly from the firmware in `firmware/`. The `ADRP` reference resolver takes the page phase (`0x800`) as a parameter — run the phase sweep first to confirm it. Derived artifacts (boot screens, carved ELFs, the extracted key) land in `out/` and aren't committed, since they rebuild from the bundles.

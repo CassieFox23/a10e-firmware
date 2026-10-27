@@ -116,11 +116,11 @@ The bootloader (`sboot.bin`) is a 4 MB headless ARM64 image: no file header, no 
 
 **1. Ghidra stalled, and the error was the clue.** Loaded raw at a guessed base, auto-analysis found 3,301 functions but couldn't tie the "blocked" strings to any code — every cross-reference came back empty, and the "entry point" decompiled to a single garbage instruction. The reason: with no valid entry to seed from, the disassembler never covered the code that's only reached through function pointers.
 
-**2. Hunting the "real load base" — and learning it doesn't exist.** The natural next step is "find the address this image is meant to load at." I tried four ways:
-- Clustering the absolute 64-bit pointers in the file → they sat around `0x8f000000`, but didn't land on function starts, so they're **runtime RAM buffers**, not code addresses.
-- Matching pointers to string starts, to function prologues, to literal-pool entries, to MOVZ/MOVK-built constants → every method smeared across many candidates with no sharp winner.
+**2. Hunting the "real load base" — and the clue I almost threw away.** The natural next step is "find the address this image is meant to load at." I tried matching the file's absolute 64-bit pointers to string starts, to function prologues, to literal-pool entries, and to MOVZ/MOVK-built constants — every method smeared across many candidates with no sharp winner. I also found a tight cluster of pointers sitting around `0x8f000000`, and because they didn't land on function starts I wrote them off as runtime RAM buffers. That was the mistake.
 
-The lesson: **ARM64 code is mostly position-relative.** It finds its own strings and functions with `ADRP+ADD` ("jump this far from *here*"), which reads the same no matter where you load it — so the file simply carries no single "base" to recover. And crucially, you don't need one.
+That cluster *is* the base. There are **834** absolute pointers in it; they start at exactly `0x8f000000` and span the whole 4 MB image (the lowest is base+0, the highest base+`0x3d0988`). A pile of self-pointers that begins at an address and reaches across the entire file only lines up for one base — so the base is `0x8f000000` (it also matches Samsung's documented Exynos sboot address).
+
+The separate lesson, and the one that actually got the code read: **ARM64 is mostly position-relative.** It finds its own strings and functions with `ADRP+ADD` ("jump this far from *here*"), which reads the same no matter where you load it. So to *read the logic* you don't need the base at all — which is why Ghidra's wrong guessed base still decompiled the relative code fine, and why the next trick works straight off the raw bytes.
 
 **3. The trick: find the reference in the raw bytes.** Since `ADRP+ADD` is position-independent, I wrote a tiny scanner that decodes those instruction pairs straight from the file and computes which string each one points at. That found the exact instruction that builds the address of the verified-boot error message — which pinned the function Ghidra had skipped. From there, `capstone` disassembled it directly. Same scanner found the Knox Guard gate a few hundred bytes away.
 
@@ -128,8 +128,8 @@ The lesson: **ARM64 code is mostly position-relative.** It finds its own strings
 
 **Takeaways for anyone poking at firmware:**
 - An empty cross-reference list in a raw image usually means "not disassembled," not "not referenced."
-- For ARM64, don't chase a load base to read logic — `ADRP+ADD` is base-independent; scan for it directly.
-- Absolute pointers in a blob are often RAM buffers, not code; don't trust a pointer cluster as a base.
+- For ARM64, you don't need a load base to read logic — `ADRP+ADD` is base-independent; scan for it directly.
+- But the base is recoverable: a self-pointer cluster that starts at one address and spans the whole image *is* the base — don't write it off as RAM buffers (the mistake I nearly made).
 - If part of a blob is a real container/ELF, extract it and let the tools do their job on headers they understand.
 
 ---

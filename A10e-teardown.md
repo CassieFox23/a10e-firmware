@@ -4,7 +4,7 @@ A hobby reverse-engineering walkthrough of the stock firmware for the **Samsung 
 
 Everything here is static analysis of firmware downloaded from Samsung's own update servers. Nothing was flashed, nothing was run on the phone, and no lock was bypassed — the opposite, really: the point was to read the locks and understand them.
 
-> **Correction, 2026-10-26.** An earlier version of this guide described a second flash lock built on a "Knox Guard token magic `0x12349876`." That was wrong. The cause was an ARM64 addressing bug (wrong `ADRP` page phase) that resolved string references to their neighbours. `0x12349876` is the Samsung **PIT** (partition table) magic, and the code in question is the partition-table parser. A blind second-pass review and an independent session both caught it on primary evidence. The method section below now walks through the bug, because it is the most useful thing in here.
+> **Correction, 2026-10-26.** An earlier version of this guide described a second flash lock built on a "Knox Guard token magic `0x12349876`." That was wrong. The cause was an ARM64 addressing bug (wrong `ADRP` page phase) that resolved string references to a string exactly 2 KB away. `0x12349876` is the Samsung **PIT** (partition table) magic, and the code in question is the partition-table parser. A blind second-pass review and an independent session both caught it on primary evidence. The method section below now walks through the bug, because it is the most useful thing in here.
 
 ---
 
@@ -67,8 +67,9 @@ I then found the code that enforces it, inside the bootloader. It's **libavb** (
 ```
 blr  x8                     ; call the public-key validator (x8 from an ops struct)
 cmp  w0, #1
-cbnz w0, <error path>
-ldrb w0, [x29, #0x4c0]      ; the "key accepted" flag it sets
+b.eq <ok, key matched>      ; result 1 -> accepted
+cbnz w0, <other error>
+ldrb w0, [x29, #0x4c0]      ; the per-partition "key accepted" flag it sets
 cbz  w0, <reject>           ; not accepted -> reject
 ...  "%s: Public key used to sign data rejected. (%d)"
 ```
@@ -83,7 +84,7 @@ Separately from verified boot, the bootloader's **Download mode** (the Odin flas
 
 **What I got wrong the first time:** I reported this gate as a check for a "token magic `0x12349876`", with a tidy four-line disassembly. That was a mistake caused by the addressing bug in the method section. The function I pointed at is actually the **PIT (partition-table) parser**: it copies a 28-byte header, checks the magic `0x12349876` (which is the identifier at the top of every Samsung PIT file — see Heimdall's `libpit`), caps the entry count at 128, and loops over 132-byte entries. It has nothing to do with Knox Guard.
 
-**What the real gate does**, once the addressing is correct: the KG handler (around file offset `0x6f8b8`) reads a `kg_state`, tests a flag bit through a helper, and — when locked — allows only a partition named `STEADY` through (`"KG locked. but allowed to flash steady."`). Anything else is refused with `"KG locked. Not allowed to flash."` / `"All binaries are not allowed to be flashed due to KG locked.(%s)"`. The decision is a state-and-partition check, logged as `[kg_state] %s but this is %s`. I did **not** find a signed-token mechanism here; what the flag bit ultimately comes from is unverified.
+**What the real gate does**, once the addressing is correct: the KG handler (around file offset `0x6f8b8`) reads a `kg_state` and tests a flag bit through a helper (`0x88bfc`, a bit-test against a global word). If that bit is set, it takes an **engineering-mode token path** — the nearby strings are `"[EMC]Certificate verify success"`, `"[EMC]Token signature verify success"` and `"[EMC]DID isn't matched"`, i.e. a signed token with certificate and signature checks (I didn't trace where the flag bit itself is set). If the bit is clear, only a partition named `STEADY` may be flashed (`"KG locked. but allowed to flash steady."`); anything else is refused with `"KG locked. Not allowed to flash."` / `"All binaries are not allowed to be flashed due to KG locked.(%s)"`. There is **no** `0x12349876` compare here — that constant was the partition-table parser next door. (So my original hunch that a signed token existed was right; I'd just pinned it to the wrong constant.)
 
 ---
 
@@ -91,11 +92,11 @@ Separately from verified boot, the bootloader's **Download mode** (the Odin flas
 
 Buried inside the bootloader are three small ARM64 ELF programs. Because they're proper ELF files (with headers and sections), they decompile cleanly, unlike the headerless bootloader itself.
 
-- Two of them are preceded by the tag `TEEGRIS_EXYNOS7904_CSMC` — Samsung's TrustZone secure OS (TEEGRIS) and its Crypto Manager helper.
-- The third is **not** tagged TEEGRIS; it's preceded by `bin/startup_loader` and is the **secure-OS loader** by content (`load_startup_tzar`, `startup.tzar.lz4`, `SECUREOS VERSION`), which unpacks the TrustZone OS at boot.
+- Two of them are preceded by the tag `TEEGRIS_EXYNOS7904_CSMC`. Neither is the secure OS itself: the larger (~60 KB) is a **CSMC handler** (it prints `CSMC: BEGIN` and the `bl_secure_info` status lines below); the smaller (~9 KB) is a tiny stub — little more than a stack-check string and generic sections.
+- The third is **not** tagged TEEGRIS; it's preceded by `bin/startup_loader` and is the **secure-OS loader** by content (`load_startup_tzar`, `startup.tzar.lz4`, `SECUREOS VERSION`). The TEEGRIS secure OS proper is the compressed `startup.tzar.lz4` this loader unpacks at boot — not one of these three ELFs.
 - One module prints Samsung's **`bl_secure_info`** fields as debug lines (`CSMC: bl_secure_info.<field>`). The fields it names include `cc_mode`, `em_status`/`em_token`, `curr_bin_status`, `frp_lock`, `kernel_rp` — and more besides (`rp_ver`, `system_rp`, `sec_boot`, `warranty_bit`, `image_status[]`, and others). So this is a secure-world module that *reports* a long list of status/lock bits; it's a readout, not the authority that sets them.
 
-**Putting it together:** the phone won't *run* unsigned images (AVB — the hard wall), won't *flash* freely once carrier/financing-locked (KG), and the state behind both lives in the secure world (TEEGRIS) where normal code can read but not change it. AVB is the one I read with full confidence; the other two I read with the caveats above.
+**Putting it together:** the phone won't *run* unsigned images (AVB — the hard wall), and won't *flash* freely once carrier/financing-locked (KG). A TEEGRIS secure-world module reports a wall of status/lock bits that normal code can read but not change. I read AVB with full confidence; KG and the secure-world details carry the caveats above — in particular I didn't tie the KG flag bit back to a specific secure-world field, so treat "it's all one structure" as unproven.
 
 ---
 
@@ -107,7 +108,7 @@ The bootloader (`sboot.bin`) is a 4 MB ARM64 image with no symbols and no obviou
 
 **2. The bug that actually bit me: the `ADRP` page phase.** ARM64 finds its own data with an `ADRP`+`ADD` pair. `ADRP` is **page**-relative: it forms `(PC & ~0xFFF) + offset`. To compute which byte a reference lands on, you need the load address **modulo 4 KB** — the "page phase". Not the whole base. Just the low 12 bits.
 
-I assumed the phase was 0 (a 4 KB-aligned base, file offset mapping straight onto a page boundary). For this image it's `0x800` — half a page. With the wrong phase, *every* string reference lands ~`0x800` bytes off, typically on the neighbouring string. The disassembly still looks fine; the references just point at the wrong text. It fails silently.
+I assumed the phase was 0 (a 4 KB-aligned base, file offset mapping straight onto a page boundary). For this image it's `0x800` — half a page. With the wrong phase, *every* string reference lands **exactly** `0x800` bytes (2 KB) off, on a different string. The disassembly still looks fine; the references just point at the wrong text. It fails silently.
 
 The right way to find the phase is to measure it: for each candidate phase, count how many `ADRP`+`ADD` pairs resolve exactly to the start of a C string. One phase wins sharply.
 
@@ -118,16 +119,16 @@ The right way to find the phase is to measure it: for each candidate phase, coun
 
 (An independent session reproduced this on a live Ghidra session: ~4249 of 6462 pairs clean at `0x800` vs ~1000 at phase 0, with phase-0 hits landing on mid-token junk.)
 
-**3. What the bug cost, and what fixing it revealed.** Under the wrong phase, the partition-table parser's `0x12349876` magic check lined up (by near-miss) with Knox Guard strings, and I wrote it up as a KG token gate. Under the correct `0x800` phase, that site cleanly references `pit_check_integrity` / `update_guid_partition_table`, and the *real* AVB key gate (file `0xa7a34`) and KG handler (file `0x6f8b8`) resolve to their own, correct strings — the ones quoted in the locks above.
+**3. What the bug cost, and what fixing it revealed.** Under the wrong phase, references land exactly `0x800` (2 KB) off. The partition-table parser's `0x12349876` magic check resolved onto Knox Guard strings 2 KB away, so I wrote it up as a KG token gate. Under the correct `0x800` phase, that site cleanly references `update_guid_partition_table` / `guid_part.c` (partition-table integrity), and the *real* AVB key gate (file `0xa7a34`) and KG handler (file `0x6f8b8`) resolve to their own, correct strings — the ones quoted in the locks above.
 
-**4. On the "load base".** Because the phase is `0x800` and not `0`, the image does **not** sit at a clean 4 KB-aligned base like `0x8f000000` (an earlier claim I've retracted — the "pointer cluster" that suggested it leans on the file's zero padding, and the two pointers at base+0 are just `ldr`/`br` jump constants in a startup stub). The full base isn't pinned, and it doesn't need to be: the page phase is all you need to resolve references. File offsets are the stable reference throughout this writeup.
+**4. On the "load base".** `ADRP` gives you the phase, not the base. For the base itself you need *absolute* pointers — and there's a clean source: a 13-entry table of partition-name pointers (file `0x12b488`) where every entry equals `base + that string's file offset`. Solve for the base and you get **`0x8ef9e800`**: all 13 entries then resolve to real partition names (`BOOTLOADER`, `BOOT`, `VBMETA`, `RADIO`, `RECOVERY`, …), and ~450 pointers image-wide land on string starts — a sharp result. Two things fall out. The phase is `0x800` because `0x8ef9e800` ends in `0x800`, not because the base is unaligned in some exotic way. And the base is `0x61800` *below* the `0x8f000000` I first chased — which turns out to be a `ldr x1,=0x8f000000; br x1` jump constant in the startup stub. That jump literal is exactly what my discarded "pointer span" argument had mistaken for the base. (You still don't *need* the base to read logic — the phase is enough — but it's there if you want it.) File offsets stay the stable reference; add `0x8ef9e800` for a VA.
 
 **5. Carve the clean bits out.** The TEEGRIS programs are real ELF files embedded mid-binary. Parsing their ELF headers to get their exact size and carving them to standalone files gave the tools something with symbols and sections — and cross-references, function boundaries and decompilation all worked normally. The right move is often to *reshape the input* rather than fight the tool.
 
 **Takeaways for anyone poking at firmware:**
 - `ADRP` is **page**-relative. To resolve a reference you need the load address mod 4 KB. Don't assume it's zero — measure it (the phase with the most references landing on clean string starts wins).
-- A wrong page phase fails *silently*: everything disassembles, references just point at neighbouring data. That's how a partition-table check got written up as a carrier lock.
-- You don't need the full load base to read logic; the page phase is enough. Don't trust a pointer cluster as a base.
+- A wrong page phase fails *silently*: everything disassembles, references just point at data exactly 2 KB away. That's how a partition-table check got written up as a carrier lock.
+- You don't need the full load base to read logic — the page phase is enough. If you *do* want the base, `ADRP` won't give it to you; find absolute pointers (a labeled pointer table pins it cleanly). A zero-padding "span" won't.
 - An empty cross-reference list in a raw image usually means "not disassembled," not "not referenced."
 - If part of a blob is a real container/ELF, extract it and let the tools work on headers they understand.
 - Get a second, blind pass before you trust your own writeup. Mine invented a lock that wasn't there.

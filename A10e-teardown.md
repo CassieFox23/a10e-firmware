@@ -100,6 +100,23 @@ Buried inside the bootloader are three small ARM64 ELF programs. Because they're
 
 ---
 
+## Could it run LineageOS?
+
+Short answer: no. Not on this phone, not without unlocking it, and it can't be unlocked.
+
+I had a LineageOS 21 "GSI" downloaded — a generic Android 14 system image, the `a64_bvN` build. Here is each gate between it and booting, from the outside in:
+
+1. **The bootloader is locked.** The phone reports `flash.locked = 1` and `device_state = locked`. Odin will not write an unofficial image, and Knox Guard backs that up.
+2. **OEM unlock is not allowed.** Android has an "OEM unlocking" switch (`oem_unlock_supported = 1`), but the device forbids using it: `oem_unlock_allowed = 0`. This is a T-Mobile US model (`carrierid = TMB`), and those ship with unlocking turned off.
+3. **Verified boot would reject it anyway.** Even if the image reached the system partition, the bootloader's AVB check (Lock #1) tests it against the RSA-4096 key baked into sboot. A LineageOS image is not signed by Samsung's key, so it is refused: "Public key used to sign data rejected."
+4. **The immovable one.** Gates 1 to 3 are policy and crypto you cannot flip from outside. On a phone that allowed unlocking, you would toggle gate 2, which relaxes gate 3. Here gate 2 is nailed shut by the carrier lock, so there is no way in. The warranty bit is still 0 — Knox has never been tripped, and there is no path to trip it into a usable unlocked state.
+
+One honest extra: even if you could flash it, whether an Android 14 system runs on this phone's Android 9 vendor code is a separate open question. We cannot test it, because we cannot flash it.
+
+So the GSI stays a souvenir. The teardown explains exactly why — this is what a locked bootloader is for.
+
+---
+
 ## How it was done — the method (the fun part, and the mistake)
 
 The bootloader (`sboot.bin`) is a 4 MB ARM64 image with no symbols and no obvious load address. It *does* begin with a small 16-byte header (word `0x00000010`, then the magic `0xfdcdbc1d`) followed by a reset-style stub at offset `0x10` — which matters below.

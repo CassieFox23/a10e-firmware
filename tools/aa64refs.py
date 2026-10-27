@@ -3,7 +3,7 @@
 # Decodes ADRP(+ADD/+LDR), ADR, and BL. No external deps.
 import sys, struct, json
 
-BASE = 0x8f000000
+BASE = 0x8ef9e800
 path = sys.argv[1]
 data = open(path, 'rb').read()
 n = len(data)
@@ -83,7 +83,7 @@ print(f"image {path}  base {BASE:#x}  size {n:#x}")
 print(f"data-ref targets: {len(refs)}   BL targets: {len(bl)}\n")
 
 print("== CONTROL: refs to known 'blocked' strings (must be non-empty) ==")
-for t in (0x8f1009a8, 0x8f100a08, 0x8f1128e8):
+for t in (0x8f09f1a8, 0x8f09f208, 0x8f0b10e8):
     s = refs.get(t, [])
     print(f"  {t:#010x}: {len(s)} site(s)" + (f"  e.g. {s[0][0]:#010x} [{s[0][1]}]" if s else "  -- NONE --"))
 

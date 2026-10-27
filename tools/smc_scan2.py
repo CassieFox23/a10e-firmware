@@ -5,7 +5,7 @@ import sys, ctypes, ctypes.util, re
 from collections import deque
 
 BIN = sys.argv[1]
-data = open(BIN, 'rb').read(); BASE = 0x8f000000; END = 0xf3000
+data = open(BIN, 'rb').read(); BASE = 0x8ef9e800; END = 0xf3000
 cs = ctypes.CDLL(ctypes.util.find_library('capstone') or '/usr/lib64/libcapstone.so.5')
 class I(ctypes.Structure):
     _fields_=[("id",ctypes.c_uint),("address",ctypes.c_uint64),("size",ctypes.c_uint16),

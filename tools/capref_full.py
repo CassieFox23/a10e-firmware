@@ -4,7 +4,7 @@
 # real code refs to an exact address stand out from sparse random false hits.
 import sys, ctypes, ctypes.util, re, bisect
 from collections import defaultdict
-BIN=sys.argv[1]; data=open(BIN,'rb').read(); BASE=0x8f000000; END=len(data)
+BIN=sys.argv[1]; data=open(BIN,'rb').read(); BASE=0x8ef9e800; END=len(data)
 cs=ctypes.CDLL(ctypes.util.find_library('capstone') or '/usr/lib64/libcapstone.so.5')
 class I(ctypes.Structure):
     _fields_=[("id",ctypes.c_uint),("address",ctypes.c_uint64),("size",ctypes.c_uint16),
@@ -63,13 +63,13 @@ def q(va,label):
     for site,k in sorted(s)[:6]: print(f"       {k} from {site:#x} (fn {enc(site) and hex(enc(site))})")
 print(f"scanned whole image; ref targets={len(refs)} bl targets={len(bl)}\n")
 print("== THREAD 3: Odin protocol string referrers ==")
-for va,l in ((0x8f1037a8,'ODIN'),(0x8f1152c8,'LOKE'),(0x8f1152a0,'DVIF'),(0x8f102558,'PIT'),(0x8f1043ef,'Download')):
+for va,l in ((0x8f0a1fa8,'ODIN'),(0x8f0b3ac8,'LOKE'),(0x8f0b3aa0,'DVIF'),(0x8f0a0d58,'PIT'),(0x8f0a2bef,'Download')):
     q(va,l)
 print("\n== THREAD 2: AVB key + pubkey validator ==")
-q(0x8f12b070,'AVB-key')
-q(0x8f322410,'AVB-key-2')
-pv=0x8f0aa298
+q(0x8f0c9870,'AVB-key')
+q(0x8f2c0c10,'AVB-key-2')
+pv=0x8f048a98
 print(f"  pubkey-validator {pv:#x}: {len(bl.get(pv,[]))} direct BL caller-site(s); caller fn(s): {[hex(enc(x)) for x in bl.get(pv,[])[:10] if enc(x)]}")
 print("\n== THREAD 2: rollback string referrers ==")
-for va,l in ((0x8f0f6b22,'rollback'),(0x8f108d37,'Rollback')):
+for va,l in ((0x8f095322,'rollback'),(0x8f0a7537,'Rollback')):
     q(va,l)

@@ -4,7 +4,7 @@
 # near file 0x6f000-0x72000 actually points at.
 import sys, ctypes, ctypes.util, re, bisect
 from collections import defaultdict
-BIN=sys.argv[1]; data=open(BIN,'rb').read(); B=0x8f000000; END=len(data); PHI=0x800
+BIN=sys.argv[1]; data=open(BIN,'rb').read(); B=0x8ef9e000; END=len(data); PHI=0x800
 cs=ctypes.CDLL(ctypes.util.find_library('capstone') or '/usr/lib64/libcapstone.so.5')
 class I(ctypes.Structure):
     _fields_=[("id",ctypes.c_uint),("address",ctypes.c_uint64),("size",ctypes.c_uint16),

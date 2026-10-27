@@ -4,7 +4,7 @@
 # and function entries). Vote base = pointer_value - landmark_file_offset; true base peaks.
 import sys, ctypes, ctypes.util, re, struct
 from collections import Counter, defaultdict
-BIN=sys.argv[1]; data=open(BIN,'rb').read(); N=len(data); SCAN=0x8f000000
+BIN=sys.argv[1]; data=open(BIN,'rb').read(); N=len(data); SCAN=0x8ef9e800
 # ---- landmarks: string starts ----
 strstarts=set()
 i=0

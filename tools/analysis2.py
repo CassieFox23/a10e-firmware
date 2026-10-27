@@ -4,7 +4,7 @@ import sys, struct, bisect
 from collections import defaultdict, Counter
 
 BIN = sys.argv[1]
-data = open(BIN, 'rb').read(); n = len(data); BASE = 0x8f000000
+data = open(BIN, 'rb').read(); n = len(data); BASE = 0x8ef9e800
 def sx(v, b): return v - (1 << b) if v & (1 << (b - 1)) else v
 
 pagerefs = defaultdict(list)   # page_va -> [site_pc]  (bare adrp)

@@ -5,7 +5,7 @@ import sys, ctypes, ctypes.util, re, json, bisect
 from collections import defaultdict, Counter
 
 BIN = sys.argv[1]
-data = open(BIN, 'rb').read(); BASE = 0x8f000000
+data = open(BIN, 'rb').read(); BASE = 0x8ef9e800
 CODE_END = 0xf3000   # disassemble the code region (strings/tables start ~0xf3730)
 
 libpath = ctypes.util.find_library('capstone') or '/usr/lib64/libcapstone.so.5'
@@ -100,19 +100,19 @@ for callee, sites in bl.items():
         if f is not None: rev[callee].add(f)
 
 print(f"disassembled code region; ref targets {len(refs)}, BL targets {len(bl)}")
-print("\n==== Q2: functions referencing the INVERSE S-box [0x8f0f6100,0x8f0f6200) ====")
+print("\n==== Q2: functions referencing the INVERSE S-box [0x8f094900,0x8f094a00) ====")
 users = Counter()
 for t, sites in refs.items():
-    if 0x8f0f6100 <= t < 0x8f0f6200:
+    if 0x8f094900 <= t < 0x8f094a00:
         for s, mn in sites: users[enc(s)] += 1
 for fn, c in users.most_common(12):
     callers = sorted(rev.get(fn, []))
     print(f"  fn {fn and hex(fn)}: {c} S-box ref(s); {len(callers)} caller(s): {[hex(x) for x in callers[:10]]}")
 
-print("\n==== Q2: same for FORWARD S-box [0x8f0fedd8,0x8f0feed8) (encrypt) ====")
+print("\n==== Q2: same for FORWARD S-box [0x8f09d5d8,0x8f09d6d8) (encrypt) ====")
 fu = Counter()
 for t, sites in refs.items():
-    if 0x8f0fedd8 <= t < 0x8f0feed8:
+    if 0x8f09d5d8 <= t < 0x8f09d6d8:
         for s, mn in sites: fu[enc(s)] += 1
 for fn, c in fu.most_common(8):
     callers = sorted(rev.get(fn, []))

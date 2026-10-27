@@ -4,7 +4,7 @@
 # adrp(off_a)+add(k) target = (P0-B) + delta - phi, where P0 is the phi=0 page-abs and
 # delta = ((phi+off_a)&~0xFFF) - (off_a&~0xFFF).
 import sys, ctypes, ctypes.util, re
-BIN=sys.argv[1]; data=open(BIN,'rb').read(); B=0x8f000000; END=len(data)
+BIN=sys.argv[1]; data=open(BIN,'rb').read(); B=0x8ef9e000; END=len(data)
 cs=ctypes.CDLL(ctypes.util.find_library('capstone') or '/usr/lib64/libcapstone.so.5')
 class I(ctypes.Structure):
     _fields_=[("id",ctypes.c_uint),("address",ctypes.c_uint64),("size",ctypes.c_uint16),

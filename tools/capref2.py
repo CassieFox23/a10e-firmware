@@ -4,8 +4,8 @@ import sys, ctypes, ctypes.util, re
 from collections import deque
 
 BIN = sys.argv[1]
-data = open(BIN, 'rb').read(); BASE = 0x8f000000; CODE_END = 0xf3000
-TARGETS = {0x8f0d563c, 0x8f0d5270, 0x8f0d52e8, 0x8f0d5424}
+data = open(BIN, 'rb').read(); BASE = 0x8ef9e800; CODE_END = 0xf3000
+TARGETS = {0x8f073e3c, 0x8f073a70, 0x8f073ae8, 0x8f073c24}
 
 cs = ctypes.CDLL(ctypes.util.find_library('capstone') or '/usr/lib64/libcapstone.so.5')
 class I(ctypes.Structure):

@@ -3,7 +3,7 @@ import sys, struct, json, math
 from collections import Counter
 
 BIN = sys.argv[1]; REFS = sys.argv[2]
-data = open(BIN, 'rb').read(); n = len(data); BASE = 0x8f000000
+data = open(BIN, 'rb').read(); n = len(data); BASE = 0x8ef9e800
 J = json.load(open(REFS))
 refs = {int(k, 16): v for k, v in J['refs'].items()}          # target -> [(site,kind)]
 bl   = {int(k, 16): v for k, v in J['bl'].items()}            # target -> [callsites]

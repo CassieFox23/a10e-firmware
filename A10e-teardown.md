@@ -137,7 +137,7 @@ The right way to find the phase is to measure it: for each candidate phase, coun
 
 ## Tools
 
-All free and local: Samsung's own firmware via `samloader`; `lz4`, `simg2img`, `debugfs`, `avbtool` for unpacking; Ghidra (via REA) for analysis, plus `capstone` (driven through a tiny `ctypes` wrapper, since the Python bindings aren't installed here) for the byte-level disassembly and the phase sweep; `binwalk` for a first pass; small Python scripts for the `ADRP` reference work. No device was connected and nothing was flashed.
+All free and local: Samsung's own firmware via `samloader`; `lz4`, `simg2img`, `debugfs`, `avbtool` for unpacking; Ghidra (via REA) for analysis, plus `capstone` (driven through a tiny `ctypes` wrapper, since the Python bindings aren't installed here) for the byte-level disassembly and the phase sweep; `binwalk` for a first pass; small Python scripts for the `ADRP` reference work. The analysis is entirely static, from downloaded firmware; the only device contact was a read-only `adb getprop` that confirmed the phone boots locked and green. Nothing was flashed, and the phone was never written to.
 
 ## Reproducing
 

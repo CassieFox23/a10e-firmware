@@ -41,15 +41,15 @@
     { "from": "pc", "to": "sboot", "label": "flash: Samsung-signed only", "variant": "security" },
     { "from": "sboot", "to": "cm", "label": "keys + lock state" },
     { "from": "sboot", "to": "vbmeta", "label": "checks signature", "variant": "security" },
-    { "from": "vbmeta", "to": "chained", "label": "own key each", "variant": "security" },
+    { "from": "vbmeta", "to": "chained", "label": "chained, same key here", "variant": "security" },
     { "from": "vbmeta", "to": "boot", "label": "SHA-256 hash", "variant": "security" },
     { "from": "boot", "to": "system", "label": "dm-verity", "variant": "emphasis", "route": "orthogonal-h" },
     { "from": "boot", "to": "vendor", "label": "dm-verity", "variant": "emphasis", "route": "orthogonal-h" }
   ],
   "cards": [
     { "dot": "violet", "title": "ELI5: a chain of ID checks", "items": ["The chip only trusts Samsung's bootloader", "The bootloader only trusts a Samsung-signed vbmeta", "vbmeta holds a fingerprint for each Android piece", "A piece with the wrong fingerprint doesn't boot"] },
-    { "dot": "rose", "title": "Why a GSI or custom kernel fails", "items": ["It changes system or boot, so the fingerprint stops matching", "A new vbmeta would need Samsung's private key", "Unlocking would let the bootloader accept it, and this phone can't unlock"] },
-    { "dot": "emerald", "title": "Read from the files tonight", "items": ["vbmeta: RSA-4096; hashes bootloader, cm, boot; dm-verity for system, vendor; 4 chained", "sboot text: 'Custom binary blocked', 'KG locked', avb_slot_verify.c", "cm.bin: CryptoManagerV40, mostly empty, the rest scrambled"] },
+    { "dot": "rose", "title": "Why a GSI or custom kernel fails", "items": ["It changes system or boot, so the fingerprint stops matching", "A new vbmeta would need Samsung's private key", "Unlocking would let the bootloader accept it, and this unit doesn't allow unlocking (sys.oem_unlock_allowed=0)"] },
+    { "dot": "emerald", "title": "Read from the files", "items": ["vbmeta: RSA-4096; hashes bootloader, cm, boot; dm-verity for system, vendor; 4 chained", "sboot text: 'Custom binary blocked', 'KG locked', avb_slot_verify.c", "cm.bin: CryptoManagerV40, mostly empty, the rest scrambled"] },
     { "dot": "slate", "title": "General knowledge or unknown", "items": ["Boot ROM checking sboot: general knowledge, not in the files", "Kernel enforcing dm-verity as it reads: general knowledge", "Whether the modem and boot screens get checked: unknown"] }
   ]
 }

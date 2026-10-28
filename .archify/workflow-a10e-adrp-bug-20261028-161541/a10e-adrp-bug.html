@@ -5724,7 +5724,6 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         <ul>
           <li>Phase 0: every reference lands exactly 0x800 bytes (2 KB) off; about 1,000 land on a clean string start</li>
           <li>Phase 0x800: about 4,249 land on a clean string start (tools/phase_test.py)</li>
-          <li>A from-scratch recompute gives around 3,600 vs 870; one phase clearly wins</li>
           <li>0x12349876 is the identifier at the top of every Samsung PIT file; under phase 0 that check was written up as a Knox Guard token gate</li>
           <li>At the right phase the same check references guid_part.c (partition-table integrity)</li>
           <li>0x8f000000 is a ldr;br jump literal, the VA of file offset 0x61800</li>

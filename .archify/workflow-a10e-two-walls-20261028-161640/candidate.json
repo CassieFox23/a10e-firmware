@@ -89,7 +89,8 @@
       "lane": "wall1",
       "col": 2,
       "type": "security",
-      "label": "OEM unlock toggle off",
+      "label": "OEM unlocking not allowed",
+      "sublabel": "(sys.oem_unlock_allowed=0)",
       "yOffset": -42
     },
     {
@@ -170,7 +171,8 @@
       "type": "messagebus",
       "icon": "none",
       "label": "VNDK-28 runtime",
-      "sublabel": "the GSI still ships it",
+      "sublabel": "the GSI still ships it (later review's read)",
+      "width": 280,
       "yOffset": -42
     },
     {
@@ -180,7 +182,8 @@
       "type": "messagebus",
       "icon": "none",
       "label": "Kernel patch level",
-      "sublabel": "GSI wants 4.4.302, phone runs 4.4.111",
+      "sublabel": "GSI wants 4.4.302 (later review's read), phone runs 4.4.111",
+      "width": 280,
       "yOffset": 42
     },
     {

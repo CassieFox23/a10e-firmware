@@ -5276,7 +5276,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         </g>
         <g data-graph-role="automatic-crossover" style="--step:4">
           <path data-graph-role="automatic-crossover-underlay" d="M 645 264 L 645 370" fill="none" stroke="var(--mask)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" pointer-events="none"/>
-          <path data-edge-from="vbmeta" data-edge-to="chained" data-edge-label="own key each" data-edge-key="4" data-composition-points="645,264;645,370" data-composition-crossover="halo" data-composition-independent="true" d="M 645 264 L 645 370" class="a-security" data-animate="edge" style="--step:4" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
+          <path data-edge-from="vbmeta" data-edge-to="chained" data-edge-label="chained, same key here" data-edge-key="4" data-composition-points="645,264;645,370" data-composition-crossover="halo" data-composition-independent="true" d="M 645 264 L 645 370" class="a-security" data-animate="edge" style="--step:4" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
         </g>
         <g data-graph-role="automatic-crossover" style="--step:5">
           <path data-graph-role="automatic-crossover-underlay" d="M 720 232 L 825 232" fill="none" stroke="var(--mask)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" pointer-events="none"/>
@@ -5458,9 +5458,9 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           <rect x="461.6" y="212" width="86.8" height="14" rx="3" class="c-mask"/>
           <text x="505" y="222" class="t-edge-security" font-size="8" text-anchor="middle">checks signature</text>
         </g>
-        <g data-detail="context" data-edge-from="vbmeta" data-edge-to="chained" data-edge-label="own key each" data-edge-key="4">
-          <rect x="571.4000000000001" y="310" width="67.6" height="14" rx="3" class="c-mask"/>
-          <text x="605.2" y="320" class="t-edge-security" font-size="8" text-anchor="middle">own key each</text>
+        <g data-detail="context" data-edge-from="vbmeta" data-edge-to="chained" data-edge-label="chained, same key here" data-edge-key="4">
+          <rect x="523.4000000000001" y="310" width="115.6" height="14" rx="3" class="c-mask"/>
+          <text x="581.2" y="320" class="t-edge-security" font-size="8" text-anchor="middle">chained, same key here</text>
         </g>
         <g data-detail="context" data-edge-from="vbmeta" data-edge-to="boot" data-edge-label="SHA-256 hash" data-edge-key="5">
           <rect x="738.7" y="212" width="67.6" height="14" rx="3" class="c-mask"/>
@@ -5714,14 +5714,14 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         <ul>
           <li>It changes system or boot, so the fingerprint stops matching</li>
           <li>A new vbmeta would need Samsung&#39;s private key</li>
-          <li>Unlocking would let the bootloader accept it, and this phone can&#39;t unlock</li>
+          <li>Unlocking would let the bootloader accept it, and this unit doesn&#39;t allow unlocking (sys.oem_unlock_allowed=0)</li>
         </ul>
       </div>
 
       <div class="card">
         <div class="card-header">
           <div class="card-dot emerald"></div>
-          <h3>Read from the files tonight</h3>
+          <h3>Read from the files</h3>
         </div>
         <ul>
           <li>vbmeta: RSA-4096; hashes bootloader, cm, boot; dm-verity for system, vendor; 4 chained</li>

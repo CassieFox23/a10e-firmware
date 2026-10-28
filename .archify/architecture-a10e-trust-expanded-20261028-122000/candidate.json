@@ -45,22 +45,22 @@
     { "from": "pc", "to": "sboot", "label": "signed only", "variant": "security" },
     { "from": "sboot", "to": "cm", "label": "keys + lock state" },
     { "from": "sboot", "to": "vbmeta", "label": "verifies", "variant": "security" },
-    { "from": "vbmeta", "to": "chained", "label": "own key", "variant": "security" },
+    { "from": "vbmeta", "to": "chained", "label": "chained, same key here", "variant": "security" },
     { "from": "vbmeta", "to": "boot", "label": "SHA-256", "variant": "security" },
     { "from": "boot", "to": "osimg", "label": "dm-verity", "variant": "emphasis" },
 
     { "from": "osimg", "to": "app", "label": "booted OS runs apps" },
-    { "from": "cm", "to": "teegris", "label": "loads TEEGRIS at boot", "variant": "security" },
+    { "from": "sboot", "to": "teegris", "label": "startup_loader loads it", "variant": "security", "toSide": "right" },
     { "from": "teegris", "to": "secdaemons", "label": "runs the trustlets" },
     { "from": "secdaemons", "to": "tznodes", "label": "via /dev/tzdev" },
     { "from": "app", "to": "selinux", "label": "every access checked", "variant": "security" },
     { "from": "selinux", "to": "dar", "label": "allows: Knox DAR only" },
-    { "from": "selinux", "to": "secdaemons", "label": "denies: 0 of 13 secure services", "variant": "dashed" }
+    { "from": "selinux", "to": "secdaemons", "label": "apps blocked from all 13 secure services", "variant": "dashed" }
   ],
   "cards": [
-    { "dot": "violet", "title": "ELI5: two walls, then a fence", "items": ["The chip trusts only Samsung's bootloader", "The bootloader runs only Samsung-signed images (verified boot)", "Once booted, SELinux fences a normal app off the secure world", "So it's locked at flash time, boot time, and run time"] },
-    { "dot": "rose", "title": "The secure-world fence (read with setools)", "items": ["untrusted_app can reach 0 of 13 secure services", "No access to the TrustZone device nodes", "Those nodes are mode 0666, so SELinux is the only gate", "The one secure node an app can touch is Knox DAR (/dev/dek_req)"] },
+    { "dot": "violet", "title": "ELI5: locked at boot, fenced while running", "items": ["The chip trusts only Samsung's bootloader", "While locked, the bootloader runs only Samsung-signed images (verified boot)", "Once booted, SELinux fences a normal app off the secure world", "So it's guarded at flash time, boot time, and run time"] },
+    { "dot": "rose", "title": "The secure-world fence (read with setools)", "items": ["untrusted_app can reach 0 of 13 secure services", "No access to the TrustZone device nodes", "Most of those nodes are mode 0666, so SELinux is the main gate", "The one secure node an app can touch is Knox DAR (/dev/dek_req)"] },
     { "dot": "emerald", "title": "What runs in the secure world", "items": ["It's TEEGRIS, not Trustonic (CONFIG_TZDEV=y)", "tzdaemon + keymaster, gatekeeper, proca, secure_storage, widevine", "21 trusted apps in /vendor/tee, all 32-bit", "Trustonic / HDCP / secure_element domains are fenced but ship no binary"] },
-    { "dot": "slate", "title": "Honest limits", "items": ["The TEEGRIS OS body isn't shipped in the firmware", "The system.img side isn't read yet (queued)", "Read static from vendor.img with debugfs; no secrets pulled", "Boot ROM checking sboot is general knowledge, not in the files"] }
+    { "dot": "slate", "title": "Limits", "items": ["The TEEGRIS OS body isn't shipped in the firmware", "system.img read too: its secure daemons get their own SELinux domains", "Read static from vendor.img with debugfs; no secrets pulled", "Boot ROM checking sboot is general knowledge, not in the files"] }
   ]
 }

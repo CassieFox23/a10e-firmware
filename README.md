@@ -6,6 +6,10 @@ it started dumb and simple: i wanted an old phone as a pet cam for the dogs whil
 
 the phone, the idea and the questions are mine. the actual reverse-engineering - the disassembly, carving the keys out, the cross-build diffs - was Claude Code driving [Ghidra](https://github.com/NationalSecurityAgency/ghidra) through the [REA](https://github.com/morluto/rea) toolkit, over two sessions. then the whole writeup got a blind second review before i called it done.
 
+the whole shape in one picture - two walls at boot, then a SELinux fence once it's running:
+
+![the A10e boot chain (AVB + Knox Guard + TEEGRIS) and the SELinux-fenced secure world](.archify/architecture-a10e-trust-expanded-20261028-122000/a10e-trust-expanded.png)
+
 ## what this actually is
 
 almost all of it is **static analysis** of firmware downloaded from Samsung. the only time anything touched the phone it was read-only - an `adb` getprop/package/partition sweep while it was booted, and a download-mode session where `heimdall` connected but pulled nothing and flashed nothing. **no partition ever got written, and no lock got bypassed.** i wasn't trying to crack anything. the point was to read the locks and actually get how they work.

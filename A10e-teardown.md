@@ -12,10 +12,10 @@ There is also a mistake in here, kept in on purpose, because it's the most usefu
 
 ## TL;DR
 
-- The A10e is Project-Treble compliant, but its bootloader is **locked** and this US-carrier model exposes no way to unlock it, so in practice no GSI or custom kernel boots on it.
+- The A10e is Project-Treble compliant, but its bootloader is **locked** and the OEM unlock toggle is off on this carrier model, so in practice no GSI or custom kernel boots on it. (These US-carrier phones are known for not exposing a working toggle; the files don't prove that part.)
 - The lock the bootloader actually *enforces* is **verified boot (AVB)**: it refuses any boot/system image not signed by a specific 4096-bit RSA key. The key got carved out, its fingerprint matched with [`avbtool`](https://android.googlesource.com/platform/external/avb/), and tied to the check in the bootloader's own code. (Unlocking the bootloader is what would relax this — which is why the lock state is the real wall.)
 - Two more locks sit alongside it: **Knox Guard** (a carrier/financing flash gate, with a signed engineering-token escape hatch) and the **TEEGRIS** secure world (a TrustZone OS that holds status bits normal code can read but not change — the teardown can show it *reads* them, not that it's the sole authority).
-- The finding was cross-checked against the previous build, the next (Android 11) build, the *unlocked* sibling model, and Samsung's own published kernel source. The AVB key and the lock strings don't change; the big OS-major code rewrite wasn't fully disassembled.
+- The finding was cross-checked against the previous build, a much later (Android 11) build, the *unlocked* sibling model, and Samsung's own published kernel source. The AVB key and the lock strings don't change; the big OS-major code rewrite wasn't fully disassembled.
 - The best part is the method, and a bug: a wrong assumption about ARM64 addressing silently turned a partition-table check into a made-up carrier lock in an early draft. That story is the main event.
 
 ---

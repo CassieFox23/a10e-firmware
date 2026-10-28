@@ -62,4 +62,4 @@ the scripts and the write-up are [GPL-3.0](https://www.gnu.org/licenses/gpl-3.0.
 
 ---
 
-*hobby project, nothing to do with Samsung. nothing here bypasses a lock or turns one on - it's just a read of how the locks work. the reverse-engineering was Claude Code with the REA / Ghidra toolchain, and the writeup got a blind review before i called it done.*
+*hobby project. the reverse-engineering was Claude Code with the REA / Ghidra toolchain, and the writeup got a blind review before i called it done.*

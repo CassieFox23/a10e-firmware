@@ -21,12 +21,12 @@ plt.rcParams.update({
 })
 
 # (pair, builds, percent differing, value label, detail under the value)
-# Teardown, Cross-checks item 2: 30.55% of the bootloader rewritten.
+# Teardown, Cross-checks item 2: 30.55% of byte positions differ (a position-by-position compare).
 # Item 4: about 16% differ (421 regions). Item 1: 2276 bytes, 0.05%.
 ROWS = [
     ("Android 11 AT&T build vs the phone's build",
      "A102USQUGCWH1 (Aug 2023) vs A102USQSDAVD1 (Apr 2022)",
-     30.55, "30.55%", "rewritten"),
+     30.55, "30.55%", "by position"),
     ("Unlocked SM-A102U1 vs carrier SM-A102U (AT&T)",
      "both Aug 2023 builds",
      16.0, "about 16%", "421 regions"),
@@ -50,7 +50,7 @@ ax.set_axisbelow(True)
 ax.tick_params(axis="x", labelsize=9.5, length=0, pad=6)
 for s in ("top", "right"): ax.spines[s].set_visible(False)
 for s in ("left", "bottom"): ax.spines[s].set_linewidth(0.8)
-ax.set_xlabel("share of sboot.bin that differs between the two builds", fontsize=9.5, labelpad=8)
+ax.set_xlabel("share of sboot.bin byte positions that differ between the two builds (moved code counts too)", fontsize=9.5, labelpad=8)
 
 # data units per pixel, for a 4 px rounded data end (4 CSS px is about 7 px at this dpi)
 (x0p, y0p), (x1p, y1p) = ax.transData.transform([(0, 0), (1, 1)])

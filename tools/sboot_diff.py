@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 import sys, hashlib, math, re
 
-AVB_KEY_OFFSETS = [0x12b070, 0x322410]
-AVB_KEY_LEN = 1032
+AVB_KEY_LEN = 1032  # libavb AvbRSAPublicKeyHeader: BE key_num_bits=0x1000, BE n0inv, 512B modulus + 512B rr
 ENTROPY_A = (0x3400, 0x1b400)
 MARKERS = [
     ("KG lock", [b"KG locked", b"Knox Guard", b"kg_state", b"KNOX TEST", b"eng token"]),
@@ -66,10 +65,20 @@ def main():
             if re.search(r"[A-Za-z0-9]{3}", aa+bb): note=f"  A='{aa}' B='{bb}'"
         print(f"  0x{s:06x}-0x{e:06x}  {ln:>6} B{note}")
 
-    print("\n-- AVB key blobs --")
-    for off in AVB_KEY_OFFSETS:
-        ka,kb=a[off:off+AVB_KEY_LEN],b[off:off+AVB_KEY_LEN]
-        print(f"  @0x{off:06x}: A {sha(ka)[:16]}  B {sha(kb)[:16]}  {'IDENTICAL' if ka==kb else 'CHANGED'}")
+    def avb_keys(buf):
+        out={}
+        i=buf.find(b"\x00\x00\x10\x00")
+        while i>=0:
+            if i%4==0 and i+AVB_KEY_LEN<=len(buf):
+                out.setdefault(sha(buf[i:i+AVB_KEY_LEN]),[]).append(i)
+            i=buf.find(b"\x00\x00\x10\x00",i+4)
+        return out
+    ka,kb=avb_keys(a),avb_keys(b)
+    print("\n-- AVB RSA-4096 pubkey blobs (located by structure, offset-independent) --")
+    print(f"  A: " + ", ".join(f"{h[:12]}@{','.join(hex(o) for o in offs)}" for h,offs in sorted(ka.items(),key=lambda x:x[1][0])))
+    print(f"  B: " + ", ".join(f"{h[:12]}@{','.join(hex(o) for o in offs)}" for h,offs in sorted(kb.items(),key=lambda x:x[1][0])))
+    print(f"  shared blob(s): {sorted(h[:12] for h in set(ka)&set(kb))}")
+    print(f"  A-only: {sorted(h[:12] for h in set(ka)-set(kb))}   B-only: {sorted(h[:12] for h in set(kb)-set(ka))}")
 
     lo,hi=ENTROPY_A
     ea,eb=a[lo:hi],b[lo:hi]

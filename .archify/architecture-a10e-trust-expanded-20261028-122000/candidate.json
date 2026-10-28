@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Galaxy A10e: the locks at boot, and the fence inside the OS",
+    "output": ".archify/architecture-a10e-trust-expanded-20261028-122000/a10e-trust-expanded.html",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "legend": {
+      "entries": {
+        "frontend": { "label": "a normal app" },
+        "security": { "label": "gatekeeper: checks / enforces" },
+        "backend": { "label": "signed Android piece" },
+        "database": { "label": "device node / stored data" },
+        "external": { "label": "outside the chain" }
+      }
+    }
+  },
+  "components": [
+    { "id": "pc", "type": "external", "label": "Your PC", "sublabel": "samloader or Odin", "pos": [240, 40], "size": [150, 56] },
+    { "id": "rom", "type": "security", "label": "Boot ROM", "sublabel": "baked into the chip", "pos": [40, 150], "size": [120, 56] },
+    { "id": "sboot", "type": "security", "label": "Bootloader", "sublabel": "sboot.bin", "pos": [240, 150], "size": [150, 60], "tag": "locked" },
+    { "id": "cm", "type": "security", "label": "Crypto Manager", "sublabel": "cm.bin, secure side", "pos": [240, 270], "size": [150, 56] },
+    { "id": "vbmeta", "type": "security", "label": "vbmeta", "sublabel": "signed list, RSA-4096", "pos": [450, 150], "size": [150, 60] },
+    { "id": "chained", "type": "backend", "label": "Chained images", "sublabel": "recovery, dtb, dtbo, product", "pos": [450, 270], "size": [170, 56] },
+    { "id": "boot", "type": "backend", "label": "Kernel", "sublabel": "boot.img", "pos": [655, 150], "size": [150, 56] },
+    { "id": "osimg", "type": "backend", "label": "Android", "sublabel": "system + vendor, dm-verity", "pos": [655, 250], "size": [180, 60] },
+
+    { "id": "app", "type": "frontend", "label": "A normal app", "sublabel": "untrusted_app", "pos": [620, 470], "size": [175, 60] },
+    { "id": "selinux", "type": "security", "label": "SELinux policy", "sublabel": "Enforcing, 0 permissive", "pos": [620, 595], "size": [175, 60], "tag": "the fence" },
+    { "id": "dar", "type": "database", "label": "Knox DAR node", "sublabel": "/dev/dek_req (allowed)", "pos": [295, 610], "size": [175, 56] },
+    { "id": "teegris", "type": "security", "label": "TEEGRIS secure world", "sublabel": "tzdaemon + trustlets", "pos": [40, 470], "size": [195, 60] },
+    { "id": "secdaemons", "type": "security", "label": "Secure HALs", "sublabel": "keymaster, gatekeeper, proca +2", "pos": [40, 580], "size": [205, 72] },
+    { "id": "tznodes", "type": "database", "label": "TrustZone nodes", "sublabel": "/dev/tzdev … mode 0666", "pos": [40, 700], "size": [195, 56] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Your PC: never trusted", "wraps": ["pc"], "pad": 12 },
+    { "kind": "security-group", "label": "Samsung's locked core", "wraps": ["rom", "sboot", "cm"], "pad": 16 },
+    { "kind": "security-group", "label": "Checked every boot (AVB + dm-verity)", "wraps": ["vbmeta", "chained", "boot", "osimg"], "pad": 16 },
+    { "kind": "security-group", "label": "Secure world (TEEGRIS): SELinux-fenced", "wraps": ["teegris", "secdaemons", "tznodes"], "pad": 18 },
+    { "kind": "region", "label": "Normal world: your apps", "wraps": ["app", "selinux"], "pad": 14 }
+  ],
+  "connections": [
+    { "from": "rom", "to": "sboot", "label": "verifies", "variant": "security" },
+    { "from": "pc", "to": "sboot", "label": "signed only", "variant": "security" },
+    { "from": "sboot", "to": "cm", "label": "keys + lock state" },
+    { "from": "sboot", "to": "vbmeta", "label": "verifies", "variant": "security" },
+    { "from": "vbmeta", "to": "chained", "label": "own key", "variant": "security" },
+    { "from": "vbmeta", "to": "boot", "label": "SHA-256", "variant": "security" },
+    { "from": "boot", "to": "osimg", "label": "dm-verity", "variant": "emphasis" },
+
+    { "from": "osimg", "to": "app", "label": "booted OS runs apps" },
+    { "from": "cm", "to": "teegris", "label": "loads TEEGRIS at boot", "variant": "security" },
+    { "from": "teegris", "to": "secdaemons", "label": "runs the trustlets" },
+    { "from": "secdaemons", "to": "tznodes", "label": "via /dev/tzdev" },
+    { "from": "app", "to": "selinux", "label": "every access checked", "variant": "security" },
+    { "from": "selinux", "to": "dar", "label": "allows: Knox DAR only" },
+    { "from": "selinux", "to": "secdaemons", "label": "denies: 0 of 13 secure services", "variant": "dashed" }
+  ],
+  "cards": [
+    { "dot": "violet", "title": "ELI5: two walls, then a fence", "items": ["The chip trusts only Samsung's bootloader", "The bootloader runs only Samsung-signed images (verified boot)", "Once booted, SELinux fences a normal app off the secure world", "So it's locked at flash time, boot time, and run time"] },
+    { "dot": "rose", "title": "The secure-world fence (read with setools)", "items": ["untrusted_app can reach 0 of 13 secure services", "No access to the TrustZone device nodes", "Those nodes are mode 0666, so SELinux is the only gate", "The one secure node an app can touch is Knox DAR (/dev/dek_req)"] },
+    { "dot": "emerald", "title": "What runs in the secure world", "items": ["It's TEEGRIS, not Trustonic (CONFIG_TZDEV=y)", "tzdaemon + keymaster, gatekeeper, proca, secure_storage, widevine", "21 trusted apps in /vendor/tee, all 32-bit", "Trustonic / HDCP / secure_element domains are fenced but ship no binary"] },
+    { "dot": "slate", "title": "Honest limits", "items": ["The TEEGRIS OS body isn't shipped in the firmware", "The system.img side isn't read yet (queued)", "Read static from vendor.img with debugfs; no secrets pulled", "Boot ROM checking sboot is general knowledge, not in the files"] }
+  ]
+}

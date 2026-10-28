@@ -54,7 +54,7 @@ print(f"AES forward S-box @ file {fwd:#x} va {BASE+fwd:#x}" if fwd>=0 else "forw
 print(f"AES inverse S-box @ file {inv:#x} va {BASE+inv:#x}" if inv>=0 else "inverse S-box not found")
 
 def fns_touching_page(page, label):
-    c = Counter(enc(s) for s in pagerefs.get(page, []) if s < 0x8f119000)
+    c = Counter(enc(s) for s in pagerefs.get(page, []) if s < BASE + 0x119000)
     print(f"\n== {label}: functions doing adrp->{page:#x} (code sites) ==")
     for fn, k in c.most_common(12):
         callers = sorted(rev.get(fn, []))
@@ -65,6 +65,6 @@ for pg in sorted({ (BASE+inv)&~0xFFF, (BASE+fwd)&~0xFFF }):
     fns_touching_page(pg, f"S-box page {pg:#x}")
 
 print("\n########## Q4: libjpeg copyright / code ##########")
-COPY = 0x8f118d60
+COPY = BASE + 0x118d60
 print(f"direct refs to copyright string {COPY:#x}: {fullrefs.get(COPY, [])}")
 fns_touching_page(COPY & ~0xFFF, f"copyright page {COPY & ~0xFFF:#x}")

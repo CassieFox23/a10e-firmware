@@ -24,10 +24,10 @@ def cluster(lo, hi, label):
             print(f"      called from {c:#010x}  (in fn {enclosing(c) and hex(enclosing(c))})")
 
 # ---------- Q2: AES cluster ----------
-cluster(0x8f0f5000, 0x8f0f8000, "Q2 AES/crypto cluster ~0x8f0f6100")
+cluster(BASE + 0xf5000, BASE + 0xf8000, "Q2 AES/crypto cluster ~file 0xf6100")
 
 # ---------- Q4: libjpeg cluster + one level up ----------
-cluster(0x8f116000, 0x8f119000, "Q4 libjpeg-turbo cluster ~0x8f118d60")
+cluster(BASE + 0x116000, BASE + 0x119000, "Q4 libjpeg-turbo cluster ~file 0x118d60")
 
 print("\n==== Q4: partition / image name strings and who references them ====")
 names = [b"PARAM", b"param", b"up_param", b"UP_PARAM", b"logo", b"LOGO", b"splash",

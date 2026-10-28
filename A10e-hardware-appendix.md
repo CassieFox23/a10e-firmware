@@ -4,6 +4,10 @@ A companion to [`A10e-teardown.md`](A10e-teardown.md) — the hardware side, rea
 
 Static, read-only. Parsed 2026-10-27 with a hand-written FDT reader (`python3 -I`), no `dtc`. Every claim below that says "in the file" was read from `out/extracted/dt.img`. Items marked "likely" or "general knowledge" are interpretation, not something the file states.
 
+The device tree in one picture — everything in the file sits on the Exynos 7885 SoC, and the board-level parts (PMIC, touch, sensors, camera modules, panel, NFC) aren't described:
+
+![Galaxy A10e device-tree hardware map: the Exynos 7885 SoC blocks, with the board layer shown as not present in dt.img](.archify/architecture-a10e-hardware-20261028-151200/a10e-hardware.png)
+
 ## The big finding
 
 **This device tree describes the Exynos SoC only. None of the board-level parts are in it.** There are 170 nodes with a `compatible`, and every one is either a SoC block, a CPU core, a reserved-memory region, or Samsung software plumbing. The I2C, SPI, UART and MMC controllers have no child nodes at all (checked: zero children under any `hsi2c`, `i2c`, `spi`, `uart`, `usi`, `speedy` or `dwmmc` node), and almost all of them are `status = "disabled"`. So there is no PMIC, fuel gauge, charger, touchscreen, accelerometer, magnetometer, image-sensor chip, audio codec, NFC chip, or display panel named anywhere in this file. A keyword sweep over the whole 8 MB image (max77, s2mpu, s2mu, fuel, gauge, charger, battery, tsp, synaptics, himax, melfas, zinitix, focal, goodix, imx, s5k, accel, gyro, magnet, proximity, nfc, codec chips, tcpc, typec, muic, panel, …) found nothing but pin-group names and input-booster key names (see the sweep note below).

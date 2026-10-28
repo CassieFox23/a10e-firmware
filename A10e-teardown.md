@@ -2,6 +2,8 @@
 
 A hobby reverse-engineering walkthrough of the stock firmware for a **Samsung Galaxy A10e (SM-A102U)** — a cheap, parked, US-carrier phone. It began as "could I turn this old handset into a pet camera?" and turned into a full read of how a modern Android phone decides what it is allowed to run, and why a carrier-locked one is a dead end for custom ROMs.
 
+I'm not affiliated with Samsung in any way, and nobody at Samsung checked this. The [README](README.md#samsung) has a short Samsung section: trademarks, where the firmware comes from, and what isn't in this repo.
+
 Almost all of this is **static analysis** of downloaded firmware. The only contact with the device was read-only: an [`adb`](https://android.googlesource.com/platform/packages/modules/adb/) property/package/partition sweep while it was booted, and a download-mode session where [`heimdall`](https://git.sr.ht/~grimler/Heimdall) connected but pulled nothing and flashed nothing. No partition was ever written, and no lock was bypassed. The point was the opposite — to *read* the locks and understand them.
 
 There is also a mistake in here, kept in on purpose, because it's the most useful part of the whole teardown. And because a single reverse-engineer fooling themselves is the normal case, the whole thing went through a blind second review; where that review narrowed a claim, this version says so.

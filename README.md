@@ -44,6 +44,16 @@ load `sboot.bin` raw, measure the `ADRP` page phase with `tools/phase_test.py` (
 
 all free and local: [`samloader`](https://github.com/topjohnwu/samloader-rs) for Samsung firmware, [`lz4`](https://github.com/lz4/lz4) / [`simg2img`](https://github.com/anestisb/android-simg2img) / [`debugfs`](https://github.com/tytso/e2fsprogs) / [`avbtool`](https://android.googlesource.com/platform/external/avb/) for unpacking, [Ghidra](https://github.com/NationalSecurityAgency/ghidra) (via [REA](https://github.com/morluto/rea)) plus [`capstone`](https://github.com/capstone-engine/capstone) for the byte-level disassembly and the phase sweep, [`binwalk`](https://github.com/ReFirmLabs/binwalk), and [`checkpolicy`](https://github.com/SELinuxProject/selinux) + [`setools`](https://github.com/SELinuxProject/setools) for the SELinux policy.
 
+## samsung
+
+i'm not affiliated with Samsung in any way. nobody at Samsung asked for this, helped with it or checked it - it's just me poking at a phone i own.
+
+- Samsung, Galaxy, Knox and Exynos are Samsung's trademarks. they show up here only to say what got looked at.
+- none of Samsung's firmware or code is in this repo. the bundles came from Samsung's own servers (the two 2023 builds from a firmware mirror), and you can grab your own with [`samloader`](https://github.com/topjohnwu/samloader-rs). the writeup only quotes short strings, addresses and a key fingerprint, as much as it takes to explain the analysis.
+- Samsung publishes the kernel source for this phone on [opensource.samsung.com](https://opensource.samsung.com) - that's what the kernel cross-check used.
+- nothing here unlocks, bypasses or weakens anything on a Samsung device. it's a read of how the locks work, not a way around them.
+- if you're from Samsung and want something here changed, open an issue and i'll sort it out.
+
 ## license
 
 the scripts and the write-up are [GPL-3.0](https://www.gnu.org/licenses/gpl-3.0.html) - see [`LICENSE`](LICENSE). the `.archify/` diagrams were made with [archify](https://github.com/tt-a1i/archify), and the generated pages carry its runtime and the [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) font ([OFL-1.1](https://openfontlicense.org)) under their own licenses.

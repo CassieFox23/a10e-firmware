@@ -46,12 +46,15 @@ all free and local: [`samloader`](https://github.com/topjohnwu/samloader-rs) for
 
 ## samsung
 
-i'm not affiliated with Samsung in any way. nobody at Samsung asked for this, helped with it or checked it - it's just me poking at a phone i own.
+quick note - i'm not affiliated with Samsung at all. nobody there asked for this, helped with it or looked it over. it's just me and a phone i own.
 
-- Samsung, Galaxy, Knox and Exynos are Samsung's trademarks. they show up here only to say what got looked at.
-- none of Samsung's firmware or code is in this repo. the bundles came from Samsung's own servers (the two 2023 builds from a firmware mirror), and you can grab your own with [`samloader`](https://github.com/topjohnwu/samloader-rs). the writeup only quotes short strings, addresses and a key fingerprint, as much as it takes to explain the analysis.
-- Samsung publishes the kernel source for this phone on [opensource.samsung.com](https://opensource.samsung.com) - that's what the kernel cross-check used.
-- nothing here unlocks, bypasses or weakens anything on a Samsung device. it's a read of how the locks work, not a way around them.
+Samsung, Galaxy, Knox and Exynos are Samsung's trademarks. the names are only here because that's what this is about.
+
+there's no Samsung firmware or code in this repo. the stock bundles came straight off Samsung's servers (the two 2023 builds off a firmware mirror), and you can pull your own with [`samloader`](https://github.com/topjohnwu/samloader-rs). the writeup quotes a few short strings, addresses and a key fingerprint - just enough to show where things are.
+
+the kernel cross-check used Samsung's own kernel source from [opensource.samsung.com](https://opensource.samsung.com) - the 4.4.177 release for the unlocked A102U1.
+
+and none of this unlocks or gets around anything on a Samsung phone. it just reads how the locks work.
 
 ## license
 

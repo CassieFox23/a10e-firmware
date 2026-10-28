@@ -52,7 +52,6 @@ i'm not affiliated with Samsung in any way. nobody at Samsung asked for this, he
 - none of Samsung's firmware or code is in this repo. the bundles came from Samsung's own servers (the two 2023 builds from a firmware mirror), and you can grab your own with [`samloader`](https://github.com/topjohnwu/samloader-rs). the writeup only quotes short strings, addresses and a key fingerprint, as much as it takes to explain the analysis.
 - Samsung publishes the kernel source for this phone on [opensource.samsung.com](https://opensource.samsung.com) - that's what the kernel cross-check used.
 - nothing here unlocks, bypasses or weakens anything on a Samsung device. it's a read of how the locks work, not a way around them.
-- if you're from Samsung and want something here changed, open an issue and i'll sort it out.
 
 ## license
 

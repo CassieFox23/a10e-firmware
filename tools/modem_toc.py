@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Parse a Samsung Shannon modem image (modem.bin / modem_debug.bin): the TOC
+# Parse a Samsung Shannon modem image (modem.bin; modem_debug.bin is a zip, not a TOC image): the TOC
 # at offset 0 (32-byte entries: name[12], offset, loadaddr, size, crc, id, all
 # u32 LE), validate the section extents against the file, then read version and
 # radio-capability strings out of the MAIN section.
@@ -15,6 +15,8 @@ def toc(buf):
     out = []
     for i in range(0, 0x200, ENTRY):
         name = buf[i:i+12].split(b"\x00", 1)[0]
+        if i == 0 and not name.isalpha():
+            break
         if not name and i != 0:
             break
         off, load, size, crc, eid = struct.unpack_from("<5I", buf, i+12)

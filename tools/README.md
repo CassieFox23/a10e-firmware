@@ -56,7 +56,7 @@ small python scripts behind the teardown. rough hobby code, no packaging, no tes
 
 ## modem
 
-- `modem_toc.py <modem.bin> [<modem2.bin> ...]` - parses the Shannon modem table of contents at offset 0 (32-byte entries: `name[12]`, offset, load address, size, crc, id, u32 LE), checks that each section fits the file, then from `MAIN` prints version / build strings (`Shannon`, `CP Version`, `RELDATE`, `a10e`), counts of radio keywords (a count is not proof of a capability) and up to 12 NR / 5G strings. reads `modem.bin` and `modem_debug.bin` from the `CP` bundle; no build constants. the header suggests `python3 -I`.
+- `modem_toc.py <modem.bin> [<modem2.bin> ...]` - parses the Shannon modem table of contents at offset 0 (32-byte entries: `name[12]`, offset, load address, size, crc, id, u32 LE), checks that each section fits the file, then from `MAIN` prints version / build strings (`Shannon`, `CP Version`, `RELDATE`, `a10e`), counts of radio keywords (a count is not proof of a capability) and up to 12 NR / 5G strings. reads `modem.bin` from the `CP` bundle (`modem_debug.bin` is a zip, so it stops at once there); no build constants. the header suggests `python3 -I`.
 
 ## pre-fix (wrong phase, kept for the record)
 

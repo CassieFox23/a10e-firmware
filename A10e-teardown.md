@@ -33,6 +33,8 @@ There is also a mistake in here, kept in on purpose, because it's the most usefu
 
 So in theory it's Treble. In practice the bootloader door in front of Treble is shut, and on this US-carrier model there's no exposed way to open it (more under "Could it run LineageOS?").
 
+A full device-tree hardware enumeration — every node, the CPU/RAM layout, and what sits on the SoC versus the board — is in the [hardware appendix](A10e-hardware-appendix.md).
+
 ---
 
 ## The firmware package

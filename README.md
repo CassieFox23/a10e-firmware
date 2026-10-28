@@ -30,6 +30,7 @@ the full story - real addresses, the AVB key tie, the SELinux policy read, the f
 | path | what it is |
 |---|---|
 | [`A10e-teardown.md`](A10e-teardown.md) | the full writeup |
+| [`A10e-hardware-appendix.md`](A10e-hardware-appendix.md) | the hardware map - every device-tree node, the CPU/RAM layout, SoC vs board |
 | `.archify/architecture-a10e-trust-20261026-193833/` | boot-chain trust diagram - who verifies whom at boot - as standalone HTML + PNG |
 | `.archify/architecture-a10e-trust-expanded-20261028-122000/` | the same chain plus the SELinux-fenced secure world, HTML + PNG |
 | `tools/` | small Python scripts that rebuild the maps and disassembly - the ADRP phase sweep (`phase_test.py`), the load-base finder (`findbase.py` / `pin_base.py`), the partition map (`pitmap.py`), the cross-build `sboot` diff (`sboot_diff.py`), the AVB key tie (`vbmeta_key_tie.py`), and others |

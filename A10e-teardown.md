@@ -1,21 +1,21 @@
 # Inside a locked phone: a Galaxy A10e firmware teardown
 
-This is a hobby walkthrough of the stock firmware on a **Samsung Galaxy A10e (SM-A102U)** - a cheap US-carrier phone that was sitting in a drawer. It started as "could I make this old phone a pet cam?" and turned into a full read of how a modern Android phone decides what it's allowed to run, and why a carrier-locked one is a dead end for custom ROMs.
+This is a hobby walkthrough of the stock firmware on a **Samsung Galaxy A10e (SM-A102U)** - a cheap US-carrier phone that was sitting in a drawer. It started as "could I make this old phone a pet cam?" and turned into a full read of how a modern Android phone decides what it's allowed to run, and why this carrier-locked one is a dead end for custom ROMs.
 
 I'm not affiliated with Samsung in any way, and nobody at Samsung checked this. The [README](README.md#samsung) has a short Samsung section: trademarks, where the firmware comes from, and what isn't in this repo.
 
 Almost all of this is **static analysis** of downloaded firmware. The phone itself only got read-only checks: an [`adb`](https://android.googlesource.com/platform/packages/modules/adb/) property/package/partition sweep while it was booted, and one download-mode session where [`heimdall`](https://git.sr.ht/~grimler/Heimdall) could see the phone but never got the partition table, and flashed nothing. No partition was ever written and no lock was bypassed. The whole point was to *read* the locks and understand them.
 
-There's also a mistake left in on purpose, because it ended up being the most useful part. A first read fooling itself is pretty normal, so the whole thing also went through a blind second review.
+There's also a mistake left in on purpose, since it turned out to be the most useful part. An early read got the ARM64 addressing wrong and invented a lock that isn't there. A blind second pass in another session flagged it, and Claude re-checked it and confirmed it.
 
 ---
 
 ## TL;DR
 
-- The A10e is Project-Treble compliant, but its bootloader is **locked** and the OEM unlock toggle is off on this carrier model, so in practice no GSI or custom kernel boots on it. (These US-carrier phones are known for not exposing a working toggle - the files don't prove that part tho.)
+- The A10e is Project-Treble compliant, but its bootloader is **locked** and OEM unlocking isn't allowed on this unit (`sys.oem_unlock_allowed=0`), so in practice no GSI or custom kernel boots on it. (These US-carrier phones are known for not exposing a working toggle - the files don't prove that part tho.)
 - The lock the bootloader actually *enforces* is **verified boot (AVB)**: while it's locked, it refuses any boot/system image not signed by one specific 4096-bit RSA key. Claude carved the key out, matched its fingerprint with [`avbtool`](https://android.googlesource.com/platform/external/avb/) and tied it to the check in the bootloader's own code. Unlocking the bootloader is what would relax this, so the lock state is the real wall.
-- Two more locks sit next to it: **Knox Guard** (a carrier/financing flash gate, with a hatch for a Samsung-signed engineering token) and the **TEEGRIS** secure world (a TrustZone OS that runs Samsung's trusted apps - the teardown shows one of its modules *reading* the lock bits, not that it's the one in charge of them).
-- Claude cross-checked the finding against the previous build, a much later (Android 11) build, the *unlocked* sibling model, and Samsung's own published kernel source. The AVB key and the lock strings don't change, but the big OS-major code rewrite wasn't fully disassembled.
+- Two more locks sit next to it: **Knox Guard** (a carrier/financing flash gate, with a hatch for a Samsung-signed engineering token) and the **TEEGRIS** secure world (a TrustZone OS that runs Samsung's trusted apps). TEEGRIS guards Samsung's secrets more than it guards what boots - the teardown shows one of its modules *reading* the lock bits, not that it's the one in charge of them.
+- Claude cross-checked the AVB key and the lock strings against the previous build, a much later (Android 11) build and the *unlocked* sibling model, and they don't change. That's keys and strings, tho - the big OS-major code rewrite wasn't fully disassembled. Samsung's own published kernel source backs the SELinux side.
 - The best part is the method and a bug: a wrong assumption about ARM64 addressing quietly turned a partition-table check into a made-up carrier lock in an early draft. That's the main story.
 
 ---
@@ -24,14 +24,14 @@ There's also a mistake left in on purpose, because it ended up being the most us
 
 | | |
 |---|---|
-| Model | SM-A102U (T-Mobile / US carrier) |
+| Model | SM-A102U (T-Mobile: the live phone's `persist.audio.sales_code` and OMC paths say `TMB`) |
 | Build analysed | `A102USQSDAVD1` - bootloader 13, Android 9, April 2022, security patch 2022-01-01 |
 | SoC | Exynos 7885-class. The firmware strings say `exynos7885` and `exynos7904`, and the device-tree overlays name **Exynos 7884B**, which is most likely the real chip. Why the other names show up isn't clear - Samsung sharing one base across sibling chips would explain it, but that's a guess. |
 | Treble | yes (`ro.treble.enabled=true`, VNDK 28, system-as-root) |
 | GSI flavour | reads as `a64_bvN` (32-bit apps, 64-bit binder). The `b` normally means A/B, but this phone has no `ro.build.ab_update` and no slot partitions, so whether that flavour fits an A-only phone isn't confirmed. |
-| Bootloader | **locked** (`device_state=locked`, `flash.locked=1`), and the OEM unlock toggle is off |
+| Bootloader | **locked** (`device_state=locked`, `flash.locked=1`), and OEM unlocking isn't allowed (`sys.oem_unlock_allowed=0`) |
 
-So on paper it's Treble, but the locked bootloader sits in front of all that, and the unlock toggle is off (more under "Could it run LineageOS?").
+So on paper it's Treble, but the locked bootloader sits in front of all that, and OEM unlocking isn't allowed (more under "Could it run LineageOS?").
 
 The device-tree hardware list (every `dt.img` node that has a `compatible`, the board parts the `dtbo.img` overlays name, and the CPU/RAM layout) is in the [hardware appendix](A10e-hardware-appendix.md).
 
@@ -50,7 +50,7 @@ Samsung firmware ships as six `.tar.md5` bundles. Most files inside are LZ4-comp
 | **HOME_CSC** | the same carrier setup, no PIT | no |
 | **USERDATA** | the carrier's starting data partition | yes |
 
-The PIT lists **38 partitions, but only 17 get written** by this firmware. The other 21 are left alone - `EFS`/`SEC_EFS`/`CPEFS` (radio identity and IMEI), `PERSISTENT` (factory-reset protection), the modem calibration areas and others. That's why reflashing stock keeps your IMEI and doesn't trip anti-theft: the identity partitions are never in the download.
+The PIT lists **38 partitions, but only 17 get written** by this firmware. The other 21 are left alone - `EFS`/`SEC_EFS`/`CPEFS` (radio identity and calibration), `PERSISTENT` (the factory-reset-protection store), the modem calibration areas and others. So a stock reflash should leave all of those exactly as they were. That's read off the PIT, not something tried, since nothing got flashed.
 
 ---
 
@@ -64,7 +64,7 @@ sboot  ──AVB verify(BOOT, RSA-4096 vs vbmeta)──▶  kernel
   │                                                 │
   │ vbmeta also carries:                            └─▶ dm-verity on system + vendor (hashtrees + FEC)
   │   • SHA-256 hashes for bootloader, cm, boot
-  │   • chained keys for recovery, dtb, dtbo, product
+  │   • chained descriptors for recovery, dtb, dtbo, product (same key)
 ```
 
 Live, the phone reports `verifiedbootstate = green`, `device_state = locked`, `selinux = enforcing` and `veritymode = enforcing`, which all line up with the static chain below.
@@ -83,7 +83,7 @@ Live, the phone reports `verifiedbootstate = green`, `device_state = locked`, `s
 
 The embedded key ties straight to the gate. A `.data` pointer at file `0x140b28` holds the address of the `0x12b070` key, and it gets loaded at file `0xaf334`, right before the Samsung check that logs `[AVB 2.0 ERR] AVB pubkey is not matched with vbmeta`. File `0xa7a34` is the call site, not the routine: inside the 10 KB verify function at file `0xa71f4`, an indirect `blr x8` calls [libavb](https://android.googlesource.com/platform/external/avb/)'s `validate_vbmeta_public_key` through the ops table. Then it tests the returned `AvbIOResult` (`cmp w0,#1` then `cbnz w0`, so only a `0` result falls through) and the key-is-trusted flag written to the stack at `[x29,#0x4c0]`. On a key that isn't trusted, `cbz w0, 0x8f0473c4` jumps to the block that points at the string *"Public key used to sign data rejected"* (VA `0x8f0aec00`), logs it through libavb's `avb_errorv`, and the path carries result code `5` - libavb's `AVB_SLOT_VERIFY_RESULT_ERROR_PUBLIC_KEY_REJECTED`. One more conditional right after the log (`ldr w0,[x29,#0x148]`, `cbnz`) is shaped like libavb's allow-verification-error hatch, the branch an unlocked phone would take, but that flag wasn't traced back to its source here. This was read in [Ghidra](https://github.com/NationalSecurityAgency/ghidra) on the 2021 `sboot_BAUJ1.bin`, and the verify function, the flash writer and the KG state engine below come out byte-for-byte identical in my own `A102USQSDAVD1` build - a `cmp` of the two sboots puts all 2276 differing bytes outside those ranges. An early pass mis-annotated these branches under the wrong `ADRP` phase, so this time there's a real listing behind it and not a guess. libavb's source-file strings are all there too (`avb_slot_verify.c`, `avb_rsa.c`, `avb_vbmeta_image.c`, descriptors).
 
-Change `system` or `boot` and its hash stops matching `vbmeta`, and `vbmeta` can't be re-signed without Samsung's private key. That's what refuses an unsigned GSI or custom kernel.
+Change `system` or `boot` and its hash stops matching `vbmeta`, and `vbmeta` can't be re-signed without Samsung's private key. That's what refuses an unsigned GSI or custom kernel while the bootloader's locked.
 
 To make sure this is the right firmware: the vbmeta digest `avbtool` works out from the staged partitions, `5d354bfd…a7e6`, **matches the live phone's `ro.boot.vbmeta.digest`**. That digest covers the signed vbmeta hash set for the boot chain, so it's strong evidence the boot images on the phone are this firmware.
 
@@ -109,7 +109,7 @@ Here's the Download-mode path, read at the correct base:
 - The lock **state** comes from a KG state engine at file `0x74968`. It reads two Knox "vault" blocks from **RPMB** (replay-protected secure storage, blocks `0x803` and `0x804`), hash-checks them (a mismatch logs `"KG vaults integrity check fail"` and the state goes `"Broken"`) and works out a state (`[KG] Normal / Locked / Blink / …`). Claude never read this phone's own KG state, since RPMB isn't readable without root.
 - There's a hatch for a Samsung-signed **engineering (EM) token** (`"This is KNOX TEST binary. Please download EM-token first!"`): a certificate chain checked in `sboot`, bound to the chip ID and read from the `STEADY` partition. Claude traced its structure and strings, not the RSA/ASN.1 verification itself, so "can't be forged" is how it's designed, not something proven end-to-end.
 
-There's also a separate signed-image check in this flow, apart from KG - `sboot` reports `"SW REV. CHECK FAIL(%s) DEVICE: %d, BINARY: %d"` (anti-rollback) plus `"Custom binary blocked by CC Mode."` / `"MDM MODE. CAN'T DOWNLOAD."`.
+There also looks to be a separate signed-image check in this flow, apart from KG (going by these strings - it wasn't traced): `sboot` reports `"SW REV. CHECK FAIL(%s) DEVICE: %d, BINARY: %d"` (anti-rollback) plus `"Custom binary blocked by CC Mode."` / `"MDM MODE. CAN'T DOWNLOAD."`.
 
 > **The mistake lives here.** An earlier version reported this gate as a check for a "token magic `0x12349876`". That was wrong (see the method section). `0x12349876` is the Samsung **PIT file identifier**, and the code it pointed at is the partition-table parser next door.
 
@@ -134,7 +134,7 @@ Tucked inside the bootloader are three small ARM64 ELF programs. Since they're r
 The locked bootloader is the wall for flashing and booting, and [SELinux](https://github.com/SELinuxProject) is the fence *inside* the running OS. The boot cmdline asks for `androidboot.selinux=permissive`, which looks alarming at first. But **Android `init` ignores it** on a user build (it only counts when the build sets `ALLOW_PERMISSIVE_SELINUX`), and the kernel has an `ALWAYS_ENFORCE` backstop on top (see the source cross-check). The phone runs Enforcing: `ro.boot.selinux=enforcing`, `ro.build.selinux.enforce=1`. Claude pulled the compiled device policy out of `vendor.img` and read it with [`checkpolicy`](https://github.com/SELinuxProject/selinux) + [`setools`](https://github.com/SELinuxProject/setools):
 
 - sepolicy **v30 MLS**, 2374 types, 95 classes, **39,074 `allow`** rules, 450 `allowxperm`.
-- **Zero domains in permissive mode**, which is a proper `user`-build lockdown. That means nothing runs *unconfined* - it doesn't mean nothing has broad powers.
+- **Zero domains in permissive mode**, which is a proper `user`-build lockdown. That means every domain is enforced - it doesn't mean nothing has broad powers.
 - `execmem` (write-then-execute memory) goes to **47 domains**: app sandboxes, the TEE/Knox app domains, *and* a fair spread of system daemons (`shell`, `rild`, `radio`, `bluetooth`, `nfc`, `hal_camera_default`, `hal_drm_default`, `healthd`, `dumpstate`, `install_recovery`, `python`). So it's scoped, but broader than just apps.
 
 **The fence around the secure world holds.** `untrusted_app` has **no `hwservice_manager find`** on any of 13 secure hwservice types (`proca`, `tee`, `teeregistry`, `wsm`, `sem`, `skpm`, `drk`, `wvkprov`, `qchdcpkprov`, `secure_storage`, `keymaster`, …), and **no `chr_file` access to the TrustZone device nodes** (`/dev/tzdev`, `/dev/tziwsock`, …), just `getattr` on `debugfs_trustzone`. The one secure node an app can touch is Knox DAR (`/dev/dek_req`, its data-at-rest encryption). The fence matters a lot here, since most of those TrustZone nodes are mode **0666** (Unix permissions wide open), so SELinux is pretty much the main thing gating them.
@@ -149,9 +149,9 @@ The system partition fills in the rest of that userspace, read the same way (`de
 
 Not on this phone - two separate things are in the way.
 
-**Wall 1 - it can't get in.** The bootloader's locked (`device_state = locked`, `flash.locked = 1`) and OEM unlocking isn't available: `ro.oem_unlock_supported = 1` but `sys.oem_unlock_allowed = 0`. One catch: `oem_unlock_allowed=0` only proves the Developer-options toggle is *off*. The AOSP `PersistentDataBlockService` sets that property from the toggle state, default 0. US-carrier A102U models are well known for not exposing a *working* toggle (so you can't flip it to 1), but that's known about the model, not proven from these files. Either way, while the bootloader's locked, AVB (Lock #1) rejects anything not signed by Samsung's key.
+**Wall 1 - it can't get in.** The bootloader's locked (`device_state = locked`, `flash.locked = 1`) and OEM unlocking isn't available: `ro.oem_unlock_supported = 1` but `sys.oem_unlock_allowed = 0`. One catch: `oem_unlock_allowed=0` only proves the Developer-options toggle is *off*. AOSP's `PersistentDataBlockService` sets that property straight from the stored toggle state (checked in the Android 9 source; Samsung's build could differ). US-carrier A102U models are well known for not exposing a *working* toggle (so you can't flip it to 1), but that's known about the model, not proven from these files. Either way, while the bootloader's locked, AVB (Lock #1) rejects anything not signed by Samsung's key.
 
-**Wall 2 - Treble's VINTF check would object.** Treble has a boot-time check (VINTF) that only pairs a system image with the phone's vendor code when their declared versions match **exactly**. This vendor declares **target-level 3** (Android 9), and the [LineageOS](https://lineageos.org) 21 (Android 14) GSI only ships compatibility matrices for **levels 4–8** (both reproduced first-hand). So by the exact-match rule there's no level-3 matrix to pair with, and the pairing should get refused - that's what the rule says should happen, not something booted to confirm. Two more details: the GSI *does* still ship the VNDK-28 runtime (`com.android.vndk.v28.apex` is present), and the kernel gap is the **patch level** (the GSI's `compatibility_matrix.4.xml` wants kernel `4.4.302`, and this phone is on `4.4.111`), not the 4.4 line itself. Whether an Android-9-era GSI would get past the check wasn't tested.
+**Wall 2 - Treble's VINTF check would object.** Treble has a boot-time check (VINTF) that only pairs a system image with the phone's vendor code when their declared versions match **exactly**. This vendor declares **target-level 3** (Android 9), and the [LineageOS](https://lineageos.org) 21 (Android 14) GSI only ships compatibility matrices for **levels 4–8** (both reproduced first-hand). So by the exact-match rule there's no level-3 matrix to pair with, and the pairing should get refused - that's what the rule says should happen, not something booted to confirm. Two more details, from a later review of the GSI (it's not on disk anymore, so they weren't re-checked here): the GSI *does* still ship the VNDK-28 runtime (`com.android.vndk.v28.apex` is present), and the kernel gap is the **patch level** (the GSI's `compatibility_matrix.4.xml` wants kernel `4.4.302`, and this phone is on `4.4.111`), not the 4.4 line itself. Whether an Android-9-era GSI would get past the check wasn't tested.
 
 So the GSI isn't going on this phone: the locked bootloader is the wall you actually hit, and VINTF is a second one behind it.
 
@@ -165,19 +165,19 @@ The bootloader (`sboot.bin`) is a 4 MB ARM64 image with no symbols and no obviou
 
 **2. The bug: the `ADRP` page phase.** ARM64 finds its own data with an `ADRP`+`ADD` pair. `ADRP` is **page**-relative: it forms `(PC & ~0xFFF) + offset`, so to know which byte a reference lands on you need the load address **modulo 4 KB** (the "page phase"), not the whole base. An early pass assumed the phase was `0`. For this image it's **`0x800`**, half a page. With the wrong phase, *every* string reference lands **exactly `0x800` bytes (2 KB) off**, on a different string. The disassembly still looks fine and the references just point at the wrong text, so it fails **silently**.
 
-The fix is to measure it: for each candidate phase, count how many `ADRP`+`ADD` pairs land exactly on the start of a C string. The repo's `tools/phase_test.py` reports ~**4249 at `0x800`** vs ~**1000 at phase 0**, and a from-scratch recompute lands around 3600 vs 870. Either way, one phase clearly wins.
+The fix is to measure it: count how many `ADRP`+`ADD` pairs land exactly on the start of a C string under phase 0 and under `0x800`. The repo's `tools/phase_test.py` does that and gets **4249 at `0x800`** vs **1000 at phase 0**, out of 6462 pairs, so one phase clearly wins.
 
 **3. What the bug cost.** Under the wrong phase, the partition-table parser's `0x12349876` check (that constant is the identifier at the top of every Samsung PIT file) had its references land on Knox Guard strings 2 KB away, so it got written up as a "KG token gate." Under the correct phase, that spot cleanly references `guid_part.c` (partition-table integrity), and the real AVB gate and KG path resolve to their own strings.
 
-**4. The base, and what actually opened it up.** `ADRP` gives you the phase, not the base. For the base you need *absolute* pointers: a 13-entry table of partition-name pointers (file `0x12b488`) where every entry equals `base + that string's file offset`. Solving that gives **`0x8ef9e800`**. The phase alone is enough to resolve string references in a hand-written scan, but **pinning the base is what really opened it up** - only then did Ghidra's analyzer follow the in-image pointer tables, auto-form the download-engine and KG functions, and let the caller walks run. The `0x8f000000` chased first is a `ldr;br` jump literal, the VA of file offset `0x61800`.
+**4. The base, and what actually opened it up.** `ADRP` gives you the phase, not the base. For the base you need *absolute* pointers: a 13-entry table of partition-name pointers (file `0x12b488`) where every entry equals `base + that string's file offset`. Solving that gives **`0x8ef9e800`**, and `tools/pin_base.py` lands on the same base another way, by voting pointer-minus-landmark across the image (392 votes, next best 115). The phase alone is enough to resolve string references in a hand-written scan, but **pinning the base is what really opened it up** - only then did Ghidra's analyzer follow the in-image pointer tables, auto-form the download-engine and KG functions, and let the caller walks run. The `0x8f000000` chased first is a `ldr;br` jump literal, the VA of file offset `0x61800`.
 
 **5. Reshape the input.** The three TEEGRIS programs are real ELF files sitting mid-binary. Carving them out into standalone files gave the tools headers, sections and cross-references to work with.
 
 If you're poking at a raw image yourself:
 - `ADRP` is **page**-relative, so measure the phase instead of assuming zero. A wrong phase fails *silently*, which is how a partition-table check got written up as a carrier lock.
 - For a raw image, **pin the load base** too: the phase reads strings, and the base is what makes the disassembler's own analysis work.
-- On a raw image, an empty cross-reference list proves nothing - it usually means "not disassembled," not "not referenced."
-- Get a blind second pass. The first pass here invented a lock that wasn't there, and a later blind review caught a dozen more places where a guess had been written up as fact.
+- On a raw image, an empty cross-reference list proves nothing - the disassembler may just not have built the references.
+- Get a blind second pass. The first pass here invented a lock that wasn't there, a blind pass in another session caught it, and later blind reviews caught more spots where a guess had been written up as fact.
 
 ---
 
@@ -187,7 +187,7 @@ One read can fool you (see above), so Claude checked the conclusion against othe
 
 **1. The previous build.** The prior build `A102USQUBAUJ1` (Oct 2021, about 6 months before this one) differs by **2276 bytes (0.05%) across ~20 regions**: version strings, per-image checksums, regenerated signatures and a few SLSI header fields (one tracks bootloader `11 → 13`). No real code change.
 
-**2. A much later build (OS-major).** The Android-11 build `A102USQUGCWH1` (Aug 2023, an **AT&T** package - a carrier sibling, *not* my T-Mobile phone's build) has **30.55% of the bootloader rewritten**. But the **AVB root key is unchanged** and the **KG/AVB/rollback string sets are byte-identical**. So it's a major rebuild that keeps the same root of trust and the same lock vocabulary, tho the rewritten 30% wasn't read instruction-by-instruction.
+**2. A much later build (OS-major).** The Android-11 build `A102USQUGCWH1` (Aug 2023, an **AT&T** package - a carrier sibling, *not* my T-Mobile phone's build) differs from this one at **30.55% of byte positions** (a straight position-by-position compare, so code that just moved counts too). But the **AVB root key is unchanged** and the **KG/AVB/rollback string sets are byte-identical**. So it's a major rebuild that keeps the same root of trust and the same lock vocabulary, tho the changed code wasn't read instruction-by-instruction.
 
 **3. The encrypted pre-boot stage, across four builds.** `sboot` carries an encrypted blob (roughly file `0x32e0`–`0x1b420`) with a plaintext `[SECLIB] Moonstone-…` tag in front of it, a secure-library stage. Hashing the encrypted body across the four `sboot` images on hand:
 
@@ -200,17 +200,17 @@ One read can fool you (see above), so Claude checked the conclusion against othe
 
 So it's **identical within an Android version and across carrier vs unlocked, and different across the OS-major bump**. The plaintext `[SECLIB] Moonstone` header is the same in all four (a 16-byte field next to it changes in 2023), and the body is uniformly random (H ≈ 7.998/8). That reads as a per-OS-version secure-library stage, not a per-device secret. Whether the 2023 change is a true re-key or just a new IV on the same library can't be told from here, and "signed" is an assumption from the `SECLIB` framing, not something shown.
 
-Plotted out, the encrypted stage is obvious - it's the flat H≈8 band at the very start, before the code drops to ~6 and the two embedded AVB keys spike back to 8:
+Plotted out, the encrypted stage is obvious - it's the flat H≈8 band at the very start, before the code drops to ~6. The other flat band near 8, just past the first AVB key, is a 90 KiB data table at `0x12c800`. Its Shannon entropy is high, but its byte counts are very lopsided (chi-square about 137,000, where random bytes give about 255), so it's dense structured data, not encrypted. The two AVB keys are only 1 KB each, so they show up as thin lines:
 
-![sboot.bin entropy - the encrypted [SECLIB] pre-boot blob at H about 8, the ARM64 code around 6, and the two embedded AVB RSA-4096 key copies](figures/entropy-sboot.png)
+![sboot.bin entropy - the encrypted [SECLIB] pre-boot blob at H about 8, the ARM64 code around 6, a 90 KiB structured data table that also reads near 8, and the two 1 KB AVB key copies as thin lines](figures/entropy-sboot.png)
 
-And here's every partition's entropy side by side - the mostly-empty Crypto Manager with its thin encrypted bands, the high-entropy boot screens, the Shannon modem, and the tiny structured vbmeta:
+And here are six of the firmware images side by side - the mostly-empty Crypto Manager with its thin encrypted bands, the high-entropy boot screens, the Shannon modem, and the tiny structured vbmeta:
 
 ![A10e firmware entropy overview - sboot, cm.bin, vbmeta, param, modem and modem_debug](figures/entropy-overview.png)
 
 **4. The unlocked sibling.** The unlocked `SM-A102U1` and the carrier `SM-A102U` AT&T build (both Aug 2023) differ by ~16% (421 regions, which weren't gone through). What *does* line up matches: the AVB keys and the OEM-unlock-related code/strings (`get_oem_unlock_val`, FRP, carrierid). The clearest difference is the sales string `USA:SINGLE` (carrier) vs `USA:OPEN` (unlocked). So the evidence points to the lock being **provisioning, not a crippled bootloader** - and `get_oem_unlock_val` itself backs that up at the code level: it's the **same 332-byte function** in both builds, same structure (the same OEM-unlock-value gate and the same read of the `PERSISTENT` partition), only its callee and string addresses shifted by the ~16% layout. So the carrier build's unlock getter isn't crippled, it's the same routine - the difference is provisioning. The rest of the ~16% wasn't gone through.
 
-**5. Samsung's own kernel source.** Samsung publishes the GPL kernel source (4.4.177, the `A102U1` release - close to, but not the same build as, the 4.4.111 binary read in Ghidra). The SELinux enforce behaviour is in there: a build-time `-DCONFIG_ALWAYS_ENFORCE=true` (from `security/selinux/Makefile`, gated on user + ship + enforce) makes `sel_write_enforce` force `enforcing`, and `RKP_KDP=y` moves the enforce flag under hypervisor protection. The source matches the mechanism in shape, not line for line. RKP, DEFEX, FIVE and PROCA source are all there, but the TIMA LKMAUTH source is withheld.
+**5. Samsung's own kernel source.** Samsung publishes the GPL kernel source (4.4.177, the `A102U1` release - close to, but not the same build as, the 4.4.111 binary read in Ghidra). The SELinux enforce behaviour is in there: a build-time `-DCONFIG_ALWAYS_ENFORCE=true` makes `sel_write_enforce` force `enforcing`, and `RKP_KDP=y` moves the enforce flag under hypervisor protection. The source matches the mechanism in shape, not line for line. RKP, DEFEX, FIVE and PROCA source are all there, but the TIMA LKMAUTH source is withheld.
 
 **And the modem, real quick:** the `CP` bundle is a Samsung **Shannon** baseband. Parsing its TOC (`tools/modem_toc.py`) gives the usual sections - `BOOT`, `MAIN` (the ~44 MB body), `VSS`, `NV`, `OFFSET` - and `MAIN` carries the version `_ShannonOS_3.5_R7`, the exact same string in both the 2022 and the 2023 modem, so that bump is a refresh of one baseband OS and not a new one. On 5G: the LTE side of `MAIN` is all there (the `SupportedBandEUTRA` capability struct, ~195 `EUTRA` symbols, the `FGI` feature bits), while the matching NR capability structures are just absent - `SupportedBandNR`, `NGRAN`, `nrBand`, `NR_CA` and `measResultListNR` all come back with zero hits in both years. There are scattered `NR` / `NSA` / `gNB` symbols, but that's the shared Shannon codebase, not a band list. So "4G LTE, no 5G" rests on the capability tables themselves here, not on reading tea leaves from stray strings. The modem's CPU core still wasn't dug out.
 
@@ -226,8 +226,8 @@ And here's every partition's entropy side by side - the mostly-empty Crypto Mana
 
 ## Tools
 
-All free and local: Samsung's firmware via [`samloader`](https://github.com/topjohnwu/samloader-rs) for the 2022/2021 builds (the 2023 builds came from a third-party firmware mirror, since Samsung's servers block headless fetches of newer builds); `lz4`, [`simg2img`](https://github.com/anestisb/android-simg2img), `debugfs`, `avbtool` for unpacking; Ghidra (via [REA](https://github.com/morluto/rea)) for analysis, plus [`capstone`](https://github.com/capstone-engine/capstone) (through a `ctypes` wrapper) for the byte-level disassembly and the ADRP phase sweep; [`binwalk`](https://github.com/ReFirmLabs/binwalk) for a first pass; `checkpolicy` + `setools-console` for the SELinux policy; and small Python scripts for the reference work. All told, the static read came to **897 REA (Ghidra) operations** across two analysis sessions - 616 in the dedicated `sboot` pass and 281 in the follow-ups. `heimdall` saw the phone in download mode, and one session got through the Odin handshake but closed without returning a PIT, so there's no live PIT/flash demo on Linux and nothing got flashed. The only device contact was that read-only `adb` sweep (`getprop`, `pm list`, the by-name map) and the heimdall session, and no partition was written.
+All free and local: Samsung's firmware via [`samloader`](https://github.com/topjohnwu/samloader-rs) for the 2022/2021 builds (the 2023 builds came from a third-party firmware mirror, since Samsung's servers block headless fetches of newer builds); `lz4`, [`simg2img`](https://github.com/anestisb/android-simg2img), `debugfs`, `avbtool` for unpacking; Ghidra (via [REA](https://github.com/morluto/rea)) for analysis, plus [`capstone`](https://github.com/capstone-engine/capstone) (through a `ctypes` wrapper) for the byte-level disassembly and the ADRP phase check; [`binwalk`](https://github.com/ReFirmLabs/binwalk) for a first pass; `checkpolicy` + `setools-console` for the SELinux policy; and small Python scripts for the reference work. All told, the static read came to **897 REA (Ghidra) operations** across two analysis sessions - 616 in the dedicated `sboot` pass and 281 in the follow-ups. `heimdall` saw the phone in download mode, and one session got through the Odin handshake but closed without returning a PIT, so there's no live PIT/flash demo on Linux and nothing got flashed. The only device contact was that read-only `adb` sweep (`getprop`, `pm list`, the by-name map) and the heimdall session, and no partition was written.
 
 ## Reproducing
 
-The `tools/` scripts rebuild the maps and disassembly from the firmware bundles (not included here - grab them with `samloader`). Run `tools/phase_test.py <sboot.bin>` first to confirm the page phase (`0x800`), then set the Ghidra image base to `0x8ef9e800`. Derived stuff (boot screens, carved ELFs, the extracted key, the cross-build sboots) lands in `out/` and isn't committed, since it all rebuilds from the bundles.
+The `tools/` scripts rebuild the maps and disassembly from the firmware bundles (not included here - grab them with `samloader`). Run `tools/phase_test.py <sboot.bin>` first to confirm the page phase (`0x800`), then `tools/pin_base.py <sboot.bin>` for the base, and set the Ghidra image base to `0x8ef9e800`. [`tools/README.md`](tools/README.md) says what each script takes and which build it expects. Derived stuff (boot screens, carved ELFs, the extracted key, the cross-build sboots) went into an untracked `out/` folder here - the scripts take their file paths as arguments, so put yours wherever.

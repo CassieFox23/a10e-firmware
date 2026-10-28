@@ -32,6 +32,11 @@ def block_entropy(data, a, b):
     c=np.bincount(seg, minlength=256).astype(np.float64); p=c[c>0]/seg.size
     return -(p*np.log2(p)).sum()
 
+def chi2(data, a, b):
+    seg=np.frombuffer(data, dtype=np.uint8)[a:b]
+    c=np.bincount(seg, minlength=256).astype(np.float64); e=seg.size/256
+    return float(((c-e)**2/e).sum())
+
 def load(p):
     with open(p,"rb") as f: return f.read()
 
@@ -42,6 +47,8 @@ def style_ax(ax, size):
     ax.set_ylim(0,8.3); ax.set_xlim(0,size); ax.set_yticks([0,2,4,6,8])
     ax.grid(True, lw=0.5, alpha=0.5)
     ax.xaxis.set_major_formatter(FuncFormatter(hexfmt)); ax.tick_params(labelsize=9)
+    step=0x80000 if size>=0x200000 else max(0x1000, 1<<(size//8).bit_length()-1)
+    ax.set_xticks(np.arange(0, size+1, step))
     for s in ax.spines.values(): s.set_linewidth(0.8)
 
 def plot_line(ax, xs, ys):
@@ -57,33 +64,40 @@ sb=load(P("sboot.bin")); size=len(sb)
 xs,ys=wentropy(sb, 1024, 256)
 a,b=0x32e0,0x1b420
 Hblock=block_entropy(sb, a, b)
-fig,ax=plt.subplots(figsize=(12,4.4), dpi=170)
+ta,tb=0x12c800,0x143000
+Htab=block_entropy(sb, ta, tb); Xtab=chi2(sb, ta, tb); Xblob=chi2(sb, a, b)
+fig,ax=plt.subplots(figsize=(12,5.4), dpi=170)
 plot_line(ax, xs, ys)
 ax.axvspan(a,b, color=ENC, alpha=0.16, lw=0)
+ax.axvspan(ta,tb, color=EDGE, alpha=0.14, lw=0)
 ax.axvline(0x1b400, color=EDGE, lw=1.1, ls="--")
 for kx in (0x12b070, 0x322410): ax.axvline(kx, color=KEY, lw=1.0, ls=":")
 style_ax(ax, size)
 ax.set_title("sboot.bin — bootloader entropy  (build A102USQSDAVD1, image checksum 0xfdcdbc1d)",
              color=FG, fontsize=12.5, pad=22, loc="left")
-ax.annotate("Shannon entropy over the 4 MB image · high = encrypted/compressed · mid ≈ ARM64 code · low = headers/padding",
+ax.annotate("Shannon entropy over the 4 MB image · high = encrypted, compressed or dense tables · mid ≈ ARM64 code · low = headers/padding",
             xy=(0,1.02), xycoords="axes fraction", color=MUTED, fontsize=9.5)
 ax.set_xlabel("file offset"); ax.set_ylabel("entropy (bits/byte)")
 handles=[
     Patch(facecolor=ENC, alpha=0.55, edgecolor="none",
-          label=f"encrypted [SECLIB] pre-boot blob · 0x32E0–0x1B420 · H ≈ {Hblock:.3f}/8"),
+          label=f"encrypted [SECLIB] pre-boot blob · 0x32E0–0x1B420 · H ≈ {Hblock:.3f}/8, χ² {Xblob:,.0f} (random ≈ 255)"),
+    Patch(facecolor=EDGE, alpha=0.45, edgecolor="none",
+          label=f"90 KiB data table, not encrypted · 0x12C800–0x143000 · H ≈ {Htab:.2f}/8 but χ² {Xtab:,.0f}"),
     Line2D([0],[0], color=EDGE, lw=1.4, ls="--", label="hard entropy edge · 0x1B400"),
-    Line2D([0],[0], color=KEY, lw=1.4, ls=":",  label="embedded AVB RSA-4096 key ×2 · 0x12B070, 0x322410"),
+    Line2D([0],[0], color=KEY, lw=1.4, ls=":",  label="embedded AVB RSA-4096 key ×2 (1 KB each, thin lines) · 0x12B070, 0x322410"),
 ]
-ax.legend(handles=handles, loc="upper right", fontsize=9, framealpha=0.9,
+ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5,-0.17), ncol=2, fontsize=9, framealpha=0.9,
           facecolor="#0b1225", edgecolor=GRID, labelcolor=FG)
 fig.tight_layout()
 f1=os.path.join(OUT_DIR,"entropy-sboot.png"); fig.savefig(f1); plt.close(fig)
-print("sboot whole-blob H =", round(float(Hblock),4), "->", f1)
+print("sboot whole-blob H =", round(float(Hblock),4), "chi2", round(Xblob), "| table H =", round(float(Htab),3), "chi2", round(Xtab), "->", f1)
 
 # ---------- Figure 2: clean overview ----------
 panels=[("sboot.bin","bootloader"),("cm.bin","Crypto Manager"),
         ("vbmeta.img","verified-boot table"),("param.bin","boot screens"),
         ("modem.bin","Shannon baseband"),("modem_debug.bin","modem debug")]
+if not all(os.path.exists(P(fn)) for fn,_ in panels):
+    print("overview skipped: needs all six images in", ENTROPY_DIR); sys.exit(0)
 fig,axes=plt.subplots(3,2, figsize=(13,9.5), dpi=150)
 fig.suptitle("Galaxy A10e firmware — entropy map of each partition",
              color=FG, fontsize=15, y=0.985)

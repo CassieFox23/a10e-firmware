@@ -12,16 +12,16 @@ the whole shape in one picture - two walls at boot, then a [SELinux](https://git
 
 ## what this actually is
 
-almost all of it is **static analysis** of firmware downloaded from Samsung. the only time anything touched the phone it was read-only - an [`adb`](https://android.googlesource.com/platform/packages/modules/adb/) getprop/package/partition sweep while it was booted, and a download-mode session where [`heimdall`](https://git.sr.ht/~grimler/Heimdall) connected but pulled nothing and flashed nothing. **no partition ever got written, and no lock got bypassed.** i wasn't trying to crack anything. the point was to read the locks and actually get how they work.
+almost all of it is **static analysis** of firmware downloaded from Samsung. the only time anything touched the phone it was read-only - an [`adb`](https://android.googlesource.com/platform/packages/modules/adb/) getprop/package/partition sweep while it was booted, and a download-mode session where [`heimdall`](https://git.sr.ht/~grimler/Heimdall) could see the phone but never got the partition table, and flashed nothing. **no partition ever got written, and no lock got bypassed.** i wasn't trying to crack anything. the point was to read the locks and actually get how they work.
 
 there's also a mistake left in on purpose. a wrong ARM64 addressing assumption (the `ADRP` page phase) quietly turned a boring partition-table check into an imaginary "carrier lock" in an early draft. honestly it's the most useful thing in here - it's why the whole writeup went thru a second, blind review, which caught about a dozen more spots where a guess had been written up as fact.
 
 ## what it found (short version)
 
-- the A10e is Project-Treble compliant, but the bootloader is **locked** and this US-carrier model gives you no way to unlock it - so no GSI or custom kernel actually boots.
-- the lock it really enforces at boot is **verified boot ([AVB](https://android.googlesource.com/platform/external/avb/))**: the bootloader refuses any boot/system image that isn't signed by one specific 4096-bit RSA key (fingerprint `e553992a79ab561a4805371cce123d1ee73db21b`).
-- two more locks sit next to it: **Knox Guard** (a carrier/financing flash gate, with a signed engineering-token escape hatch) and the **TEEGRIS** TrustZone secure world (it holds status bits normal code can read but not change).
-- the finding holds across the previous build, the next (Android 11) build, the *unlocked* sibling model, and Samsung's own published kernel source - the AVB key and the lock strings don't change.
+- the A10e is Project-Treble compliant, but the bootloader is **locked** and the OEM unlock toggle is off on this carrier model - so no GSI or custom kernel boots. these US-carrier phones are known for not exposing a working toggle, tho these files don't prove that part.
+- the lock it really enforces at boot is **verified boot ([AVB](https://android.googlesource.com/platform/external/avb/))**: while it's locked, the bootloader refuses any boot/system image that isn't signed by one specific 4096-bit RSA key (fingerprint `e553992a79ab561a4805371cce123d1ee73db21b`).
+- two more locks sit next to it: **Knox Guard** (a carrier/financing flash gate, with a hatch for a Samsung-signed engineering token) and the **TEEGRIS** TrustZone secure world, which runs Samsung's trusted apps apart from Android (SELinux keeps normal apps away from it, Knox DAR aside).
+- the finding holds across the previous build, a much later (Android 11) build, the *unlocked* sibling model, and Samsung's own published kernel source - the AVB key and the lock strings don't change.
 
 the full story - real addresses, the AVB key tie, the SELinux policy read, the four cross-checks and the bug - is in **[`A10e-teardown.md`](A10e-teardown.md)**. that's the one to read.
 

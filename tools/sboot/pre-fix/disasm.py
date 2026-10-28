@@ -1,4 +1,5 @@
-import sys, struct
+# pre-fix: assumes base 0x80000000 and annotates strings from file offsets, so its labels are wrong - kept for the record; load at 0x8ef9e800 instead
+import sys
 from capstone import Cs, CS_ARCH_ARM64, CS_MODE_LITTLE_ENDIAN
 data=open(sys.argv[1],"rb").read()
 start=int(sys.argv[2],16); end=int(sys.argv[3],16)

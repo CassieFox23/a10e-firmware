@@ -75,8 +75,8 @@ def main():
         return out
     ka,kb=avb_keys(a),avb_keys(b)
     print("\n-- AVB RSA-4096 pubkey blobs (located by structure, offset-independent) --")
-    print(f"  A: " + ", ".join(f"{h[:12]}@{','.join(hex(o) for o in offs)}" for h,offs in sorted(ka.items(),key=lambda x:x[1][0])))
-    print(f"  B: " + ", ".join(f"{h[:12]}@{','.join(hex(o) for o in offs)}" for h,offs in sorted(kb.items(),key=lambda x:x[1][0])))
+    print("  A: " + ", ".join(f"{h[:12]}@{','.join(hex(o) for o in offs)}" for h,offs in sorted(ka.items(),key=lambda x:x[1][0])))
+    print("  B: " + ", ".join(f"{h[:12]}@{','.join(hex(o) for o in offs)}" for h,offs in sorted(kb.items(),key=lambda x:x[1][0])))
     print(f"  shared blob(s): {sorted(h[:12] for h in set(ka)&set(kb))}")
     print(f"  A-only: {sorted(h[:12] for h in set(ka)-set(kb))}   B-only: {sorted(h[:12] for h in set(kb)-set(ka))}")
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import sys, struct, json, math
+import sys, json, math
 from collections import Counter
 
 BIN = sys.argv[1]; REFS = sys.argv[2]

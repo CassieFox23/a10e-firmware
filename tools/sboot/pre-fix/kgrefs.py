@@ -1,3 +1,4 @@
+# pre-fix: forms ADRP pages from file offsets (phase 0), so its "KG gate" refs land 2 KB off - kept for the record, see A10e-teardown.md "How it was done"
 import sys, struct
 data=open(sys.argv[1],"rb").read(); n=len(data)
 def w(fo): return struct.unpack_from("<I",data,fo)[0]

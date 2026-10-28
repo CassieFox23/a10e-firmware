@@ -2,7 +2,7 @@
 # Re-resolve ADRP+ADD references under the CORRECT page phase 0x800. Work in FILE OFFSETS
 # (base/VA is now uncertain). Answer: entropy-A refs, AVB-key refs, and what the KG/PIT code
 # near file 0x6f000-0x72000 actually points at.
-import sys, ctypes, ctypes.util, re, bisect
+import sys, ctypes, ctypes.util, re
 from collections import defaultdict
 BIN=sys.argv[1]; data=open(BIN,'rb').read(); B=0x8ef9e000; END=len(data); PHI=0x800
 cs=ctypes.CDLL(ctypes.util.find_library('capstone') or '/usr/lib64/libcapstone.so.5')

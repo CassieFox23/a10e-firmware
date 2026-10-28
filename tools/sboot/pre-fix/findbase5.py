@@ -1,3 +1,4 @@
+# pre-fix: only votes for page-aligned bases (phase 0), so it can never find the real 0x8ef9e800 - kept for the record; use tools/pin_base.py
 import sys, struct, collections
 data = open(sys.argv[1], "rb").read()
 n = len(data)

@@ -55,7 +55,7 @@ for off in range(0, N-8, 8):
         votes[B]+=1
         if len(examples[B])<6: examples[B].append((off,V,L))
 print(f"candidate pointers in window: {nptr}")
-print(f"\ntop base candidates (base = ptr - landmark, phase 0x800):")
+print("\ntop base candidates (base = ptr - landmark, phase 0x800):")
 for B,c in votes.most_common(12):
     print(f"  base {B:#x}: {c} votes")
 if votes:

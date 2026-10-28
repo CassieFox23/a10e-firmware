@@ -1,4 +1,4 @@
-import sys, os, re, json, struct, subprocess, tarfile
+import sys, os, json, struct, subprocess, tarfile
 fw = sys.argv[1]; out = sys.argv[2]
 def ident(h):
     if h[:4] == b"\x3a\xff\x26\xed":

@@ -1,0 +1,326 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Why LineageOS can't go on this phone: two walls",
+    "output": ".archify/workflow-a10e-two-walls-20261028-161640/a10e-two-walls.html",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "legend": {
+      "entries": {
+        "external": {
+          "label": "where it starts"
+        },
+        "security": {
+          "label": "a lock or check"
+        },
+        "database": {
+          "label": "exact setting or key"
+        },
+        "backend": {
+          "label": "gets through"
+        },
+        "messagebus": {
+          "label": "a smaller detail"
+        }
+      }
+    }
+  },
+  "lanes": [
+    {
+      "id": "wall1",
+      "label": "Wall 1 - getting in"
+    },
+    {
+      "id": "wall2",
+      "label": "Wall 2 - the VINTF version check"
+    },
+    {
+      "id": "compare",
+      "label": "Comparison - the tablets"
+    }
+  ],
+  "groups": [
+    {
+      "id": "details",
+      "label": "Smaller details",
+      "lane": "wall2",
+      "fromCol": 4,
+      "toCol": 4,
+      "variant": "dashed"
+    }
+  ],
+  "mainPath": [
+    "gsi",
+    "locked",
+    "toggle",
+    "avb",
+    "resign"
+  ],
+  "nodes": [
+    {
+      "id": "gsi",
+      "lane": "wall1",
+      "col": 0,
+      "type": "external",
+      "label": "LineageOS 21",
+      "sublabel": "Android 14 GSI",
+      "yOffset": -42
+    },
+    {
+      "id": "locked",
+      "lane": "wall1",
+      "col": 1,
+      "type": "security",
+      "label": "Bootloader locked",
+      "yOffset": -42
+    },
+    {
+      "id": "locked_ev",
+      "lane": "wall1",
+      "col": 1,
+      "type": "database",
+      "label": "device_state = locked",
+      "sublabel": "flash.locked = 1",
+      "yOffset": 42
+    },
+    {
+      "id": "toggle",
+      "lane": "wall1",
+      "col": 2,
+      "type": "security",
+      "label": "OEM unlock toggle off",
+      "yOffset": -42
+    },
+    {
+      "id": "toggle_ev",
+      "lane": "wall1",
+      "col": 2,
+      "type": "database",
+      "label": "sys.oem_unlock_allowed = 0",
+      "sublabel": "ro.oem_unlock_supported = 1",
+      "yOffset": 42
+    },
+    {
+      "id": "avb",
+      "lane": "wall1",
+      "col": 3,
+      "type": "security",
+      "label": "AVB rejects the image",
+      "sublabel": "while bootloader is locked",
+      "yOffset": -42
+    },
+    {
+      "id": "avb_ev",
+      "lane": "wall1",
+      "col": 3,
+      "type": "database",
+      "label": "Samsung's 4096-bit key",
+      "sublabel": "the only key it accepts",
+      "yOffset": 42
+    },
+    {
+      "id": "resign",
+      "lane": "wall1",
+      "col": 4,
+      "type": "security",
+      "icon": "stop",
+      "label": "vbmeta can't be re-signed",
+      "sublabel": "needs Samsung's private key",
+      "yOffset": -42
+    },
+    {
+      "id": "matrices",
+      "lane": "wall2",
+      "col": 0,
+      "type": "external",
+      "label": "LineageOS 21 GSI",
+      "sublabel": "matrices: levels 4 to 8 only"
+    },
+    {
+      "id": "vendor",
+      "lane": "wall2",
+      "col": 1,
+      "type": "security",
+      "label": "Phone's vendor code",
+      "sublabel": "target-level 3 (Android 9)"
+    },
+    {
+      "id": "rule",
+      "lane": "wall2",
+      "col": 2,
+      "type": "security",
+      "icon": "decision",
+      "label": "Exact-match rule",
+      "sublabel": "versions must match exactly"
+    },
+    {
+      "id": "refused2",
+      "lane": "wall2",
+      "col": 3,
+      "type": "security",
+      "icon": "stop",
+      "label": "Should be refused",
+      "sublabel": "by the rule, not booted"
+    },
+    {
+      "id": "vndk",
+      "lane": "wall2",
+      "col": 4,
+      "type": "messagebus",
+      "icon": "none",
+      "label": "VNDK-28 runtime",
+      "sublabel": "the GSI still ships it",
+      "yOffset": -42
+    },
+    {
+      "id": "kernel",
+      "lane": "wall2",
+      "col": 4,
+      "type": "messagebus",
+      "icon": "none",
+      "label": "Kernel patch level",
+      "sublabel": "GSI wants 4.4.302, phone runs 4.4.111",
+      "yOffset": 42
+    },
+    {
+      "id": "tab",
+      "lane": "compare",
+      "col": 0,
+      "type": "external",
+      "label": "Galaxy Tab A8",
+      "sublabel": "the tablets"
+    },
+    {
+      "id": "tabunlock",
+      "lane": "compare",
+      "col": 2,
+      "type": "backend",
+      "icon": "success",
+      "label": "OEM unlock allowed"
+    },
+    {
+      "id": "tabpast",
+      "lane": "compare",
+      "col": 3,
+      "type": "backend",
+      "icon": "success",
+      "label": "Past wall 1"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-gsi-locked",
+      "from": "gsi",
+      "to": "locked",
+      "label": "get in?",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-locked-toggle",
+      "from": "locked",
+      "to": "toggle",
+      "variant": "security"
+    },
+    {
+      "id": "e-toggle-avb",
+      "from": "toggle",
+      "to": "avb",
+      "variant": "security"
+    },
+    {
+      "id": "e-avb-resign",
+      "from": "avb",
+      "to": "resign",
+      "label": "re-sign it?",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "e-locked-ev",
+      "from": "locked",
+      "to": "locked_ev",
+      "variant": "dashed",
+      "role": "branch",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "e-toggle-ev",
+      "from": "toggle",
+      "to": "toggle_ev",
+      "variant": "dashed",
+      "role": "branch",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "e-avb-ev",
+      "from": "avb",
+      "to": "avb_ev",
+      "variant": "dashed",
+      "role": "branch",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "e-gsi-matrices",
+      "from": "gsi",
+      "to": "matrices",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-matrices-vendor",
+      "from": "matrices",
+      "to": "vendor",
+      "label": "paired with",
+      "variant": "security"
+    },
+    {
+      "id": "e-vendor-rule",
+      "from": "vendor",
+      "to": "rule",
+      "variant": "security"
+    },
+    {
+      "id": "e-rule-refused",
+      "from": "rule",
+      "to": "refused2",
+      "label": "no level-3 matrix",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "e-tab-unlock",
+      "from": "tab",
+      "to": "tabunlock",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-unlock-past",
+      "from": "tabunlock",
+      "to": "tabpast",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "violet",
+      "title": "In plain words",
+      "items": [
+        "Wall 1: the locked phone only runs Samsung-signed images",
+        "Wall 2: Treble pairs a system with vendor code only when versions match exactly",
+        "The locked bootloader is the wall you actually hit; the VINTF check is a second one behind it"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "How sure is Wall 2?",
+      "items": [
+        "Level 3 and levels 4 to 8 were both reproduced first-hand",
+        "The refusal is what the exact-match rule says should happen",
+        "It was not booted to confirm, and an Android 9-era GSI was not tested"
+      ]
+    }
+  ]
+}

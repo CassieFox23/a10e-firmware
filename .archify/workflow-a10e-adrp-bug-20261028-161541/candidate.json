@@ -1,0 +1,99 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "The ADRP page-phase bug: one wrong guess that fails silently",
+    "output": ".archify/workflow-a10e-adrp-bug-20261028-161541/a10e-adrp-bug.html",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "legend": {
+      "entries": {
+        "frontend": { "label": "how ARM64 code works" },
+        "security": { "label": "wrong guess and its cost" },
+        "backend": { "label": "measured, correct" },
+        "database": { "label": "pointer table in the file" },
+        "external": { "label": "dead end" }
+      }
+    }
+  },
+  "lanes": [
+    { "id": "setup", "label": "How ARM64 code finds data" },
+    { "id": "wrong", "label": "Wrong guess: phase 0", "variant": "exception" },
+    { "id": "right", "label": "Measured: phase 0x800" },
+    { "id": "base", "label": "Then the base" }
+  ],
+  "mainPath": ["adrp", "phase", "m1", "m2", "m3", "m4"],
+  "nodes": [
+    { "id": "adrp", "lane": "setup", "col": 0, "type": "frontend", "label": "ADRP + ADD pair", "sublabel": "finds a string or data" },
+    { "id": "phase", "lane": "setup", "col": 1, "type": "frontend", "label": "Page phase", "sublabel": "load address mod 4 KB" },
+
+    { "id": "w1", "lane": "wrong", "col": 2, "type": "security", "label": "Guess phase 0", "sublabel": "an early pass assumed it" },
+    { "id": "w2", "lane": "wrong", "col": 3, "type": "security", "label": "Every ref 0x800 off", "sublabel": "2 KB away, a different string" },
+    { "id": "w3", "lane": "wrong", "col": 4, "type": "security", "label": "~1,000 clean hits", "sublabel": "land on a clean string start" },
+    { "id": "w4", "lane": "wrong", "col": 5, "type": "security", "label": "Knox Guard token gate", "sublabel": "0x12349876 check, misread" },
+
+    { "id": "m1", "lane": "right", "col": 2, "type": "backend", "label": "Test each phase", "sublabel": "count clean string starts" },
+    { "id": "m2", "lane": "right", "col": 3, "type": "backend", "label": "Phase 0x800", "sublabel": "half a page, measured" },
+    { "id": "m3", "lane": "right", "col": 4, "type": "backend", "label": "~4,249 clean hits", "sublabel": "land on a clean string start" },
+    { "id": "m4", "lane": "right", "col": 5, "type": "backend", "label": "guid_part.c", "sublabel": "same check: table integrity" },
+
+    { "id": "b0", "lane": "base", "col": 1, "type": "frontend", "label": "Phase is not the base", "sublabel": "ADRP gives phase only" },
+    { "id": "b1", "lane": "base", "col": 2, "type": "external", "label": "0x8f000000", "sublabel": "a jump literal, not the base" },
+    { "id": "b2", "lane": "base", "col": 3, "type": "database", "label": "13 name pointers", "sublabel": "partition names, file 0x12b488" },
+    { "id": "b3", "lane": "base", "col": 4, "type": "backend", "label": "Base 0x8ef9e800", "sublabel": "entry = base + string offset" },
+    { "id": "b4", "lane": "base", "col": 5, "type": "backend", "label": "Ghidra opens up", "sublabel": "follows the pointer tables" }
+  ],
+  "edges": [
+    { "id": "e-adrp-phase", "from": "adrp", "to": "phase", "label": "page-relative", "variant": "default" },
+    { "id": "e-phase-w1", "from": "phase", "to": "w1", "variant": "security", "role": "error" },
+    { "id": "e-phase-m1", "from": "phase", "to": "m1", "label": "tools/phase_test.py", "variant": "emphasis" },
+    { "id": "e-phase-b0", "from": "phase", "to": "b0", "variant": "default", "role": "branch" },
+
+    { "id": "e-w1-w2", "from": "w1", "to": "w2", "variant": "security" },
+    { "id": "e-w2-w3", "from": "w2", "to": "w3", "label": "fails silently", "variant": "security" },
+    { "id": "e-w3-w4", "from": "w3", "to": "w4", "variant": "security" },
+
+    { "id": "e-m1-m2", "from": "m1", "to": "m2", "variant": "emphasis" },
+    { "id": "e-m2-m3", "from": "m2", "to": "m3", "variant": "emphasis" },
+    { "id": "e-m3-m4", "from": "m3", "to": "m4", "label": "right phase", "variant": "emphasis" },
+
+    { "id": "e-b0-b1", "from": "b0", "to": "b1", "label": "chased first", "variant": "dashed", "role": "branch" },
+    { "id": "e-b1-b2", "from": "b1", "to": "b2", "variant": "default" },
+    { "id": "e-b2-b3", "from": "b2", "to": "b3", "label": "solve", "variant": "emphasis" },
+    { "id": "e-b3-b4", "from": "b3", "to": "b4", "label": "unlocks", "variant": "emphasis" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "In plain words",
+      "items": [
+        "ARM64 code finds data with an ADRP + ADD pair",
+        "ADRP counts from the start of a 4 KB page, so you need the load address mod 4 KB (the page phase)",
+        "With the wrong phase, every string reference lands on a different string",
+        "The disassembly still looks fine, so it fails silently"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "The numbers, and what it cost",
+      "items": [
+        "Phase 0: every reference lands exactly 0x800 bytes (2 KB) off; about 1,000 land on a clean string start",
+        "Phase 0x800: about 4,249 land on a clean string start (tools/phase_test.py)",
+        "A from-scratch recompute gives around 3,600 vs 870; one phase clearly wins",
+        "0x12349876 is the identifier at the top of every Samsung PIT file; under phase 0 that check was written up as a Knox Guard token gate",
+        "At the right phase the same check references guid_part.c (partition-table integrity)",
+        "0x8f000000 is a ldr;br jump literal, the VA of file offset 0x61800"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Take-away",
+      "items": [
+        "Measure the phase instead of assuming zero",
+        "Pin the load base too: the phase reads strings, the base makes the disassembler's own analysis work",
+        "On a raw image an empty cross-reference list proves nothing",
+        "Get a blind second pass: the first pass here invented a lock that was not there"
+      ]
+    }
+  ]
+}

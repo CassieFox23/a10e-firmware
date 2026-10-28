@@ -23,7 +23,25 @@ there's also a mistake left in on purpose. a wrong ARM64 addressing assumption (
 - two more locks sit next to it: **Knox Guard** (a carrier/financing flash gate, with a hatch for a Samsung-signed engineering token) and the **TEEGRIS** TrustZone secure world, which runs Samsung's trusted apps apart from Android (SELinux keeps normal apps away from it, Knox DAR aside).
 - the finding holds across the previous build, a much later (Android 11) build, the *unlocked* sibling model, and Samsung's own published kernel source - the AVB key and the lock strings don't change.
 
+why Lineage can't go on, drawn out - the locked bootloader is the wall you actually hit, and the VINTF check is a second one behind it:
+
+![two walls: wall 1 is the locked bootloader with the OEM unlock toggle off and AVB only taking Samsung's key, wall 2 is the VINTF level mismatch (vendor level 3 vs GSI levels 4 to 8), and the Tab A8s got past wall 1 because they allow OEM unlock](.archify/workflow-a10e-two-walls-20261028-161640/a10e-two-walls.png)
+
+and how much the bootloader actually changed between builds - the AVB key never did:
+
+![how much sboot.bin changed: 30.55% between the 2022 phone build and the 2023 AT&T build, about 16% between the unlocked and carrier 2023 builds, 0.05% from the 2021 build; the AVB root key is the same in all three](figures/sboot-diff-chart.png)
+
+sboot.bin's entropy, plotted - the encrypted pre-boot stage is the flat band right at the start, then the code drops lower and the two copies of the AVB key spike back up:
+
+![sboot.bin entropy - the encrypted pre-boot blob near the maximum, the ARM64 code lower, and the two embedded AVB key copies](figures/entropy-sboot.png)
+
 the full story - real addresses, the AVB key tie, the SELinux policy read, the four cross-checks and the bug - is in **[`A10e-teardown.md`](A10e-teardown.md)**. that's the one to read.
+
+## the hardware
+
+what's actually on the board, pulled from the device tree and its board overlays - the [appendix](A10e-hardware-appendix.md) has the full list:
+
+![the A10e hardware from the device tree: the Exynos SoC blocks in the base tree, and the board layer (PMICs, charger, codec, touch, sensors, cameras, NFC) named by the three dtbo.img overlays](.archify/architecture-a10e-hardware-20261028-151200/a10e-hardware.png)
 
 ## what's in here
 
@@ -33,6 +51,10 @@ the full story - real addresses, the AVB key tie, the SELinux policy read, the f
 | [`A10e-hardware-appendix.md`](A10e-hardware-appendix.md) | the hardware map - every `dt.img` node with a `compatible` (170 of 430), the board parts the `dtbo.img` overlays name, the CPU/RAM layout, SoC vs board |
 | `.archify/architecture-a10e-trust-20261026-193833/` | boot-chain trust diagram - who verifies whom at boot - as standalone HTML + PNG |
 | `.archify/architecture-a10e-trust-expanded-20261028-122000/` | the same chain plus the SELinux-fenced secure world, HTML + PNG |
+| `.archify/architecture-a10e-hardware-20261028-151200/` | the hardware map - SoC blocks and the board layer - HTML + PNG |
+| `.archify/workflow-a10e-two-walls-20261028-161640/` | why Lineage can't go on - the two walls - HTML + PNG |
+| `.archify/workflow-a10e-adrp-bug-20261028-161541/` | the `ADRP` page-phase bug, step by step - HTML + PNG |
+| `figures/` | the entropy plots and the cross-build change chart (made by `tools/entropy_plot.py` and `tools/sboot_diff_chart.py`) |
 | `tools/` | small Python scripts that rebuild the maps and disassembly - the ADRP phase sweep (`phase_test.py`), the load-base finder (`findbase.py` / `pin_base.py`), the partition map (`pitmap.py`), the cross-build `sboot` diff (`sboot_diff.py`), the AVB key tie (`vbmeta_key_tie.py`), and others |
 
 the firmware bundles themselves aren't in here - they're big and you can just redownload them. grab them with [`samloader`](https://github.com/topjohnwu/samloader-rs), then point the `tools/` scripts at your own copies. derived stuff (the carved AVB key, boot screens, the TEEGRIS ELFs, the cross-build sboots) rebuilds into `out/`, which is left untracked.
@@ -40,6 +62,10 @@ the firmware bundles themselves aren't in here - they're big and you can just re
 ## the method in one line
 
 load `sboot.bin` raw, measure the `ADRP` page phase with `tools/phase_test.py` (it's `0x800`, not `0`), pin the load base at `0x8ef9e800` from the absolute pointer tables, and only then does Ghidra follow the in-image pointers and resolve the AVB and Knox Guard paths to their own strings. the static read ran to **897 Ghidra operations** across the two sessions.
+
+the bug that made it interesting, drawn out - one wrong guess about the page phase, and how measuring it fixed everything after:
+
+![the ADRP page-phase bug: guessing phase 0 sends every reference 2 KB off (about 1,000 clean hits) and turns the partition-table check into a fake Knox Guard gate; measuring phase 0x800 gives about 4,249 clean hits, then 13 name pointers pin the base at 0x8ef9e800](.archify/workflow-a10e-adrp-bug-20261028-161541/a10e-adrp-bug.png)
 
 ## tools
 

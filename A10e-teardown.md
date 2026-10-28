@@ -33,7 +33,7 @@ There's also a mistake left in on purpose, because it ended up being the most us
 
 So on paper it's Treble, but the locked bootloader sits in front of all that, and the unlock toggle is off (more under "Could it run LineageOS?").
 
-The full device-tree hardware list (every node, the CPU/RAM layout, and what sits on the SoC versus the board) is in the [hardware appendix](A10e-hardware-appendix.md).
+The device-tree hardware list (every `dt.img` node that has a `compatible`, the board parts the `dtbo.img` overlays name, and the CPU/RAM layout) is in the [hardware appendix](A10e-hardware-appendix.md).
 
 ---
 

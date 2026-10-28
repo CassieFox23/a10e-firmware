@@ -2,16 +2,16 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "Galaxy A10e: what the device tree describes (the SoC, not the board)",
+    "title": "Galaxy A10e: what the device tree describes (base tree plus board overlays)",
     "output": ".archify/architecture-a10e-hardware-20261028-151200/a10e-hardware.html",
     "locale": "en",
     "quality_profile": "showcase",
     "legend": {
       "entries": {
-        "backend": { "label": "on-SoC block" },
+        "backend": { "label": "in the base tree (dt.img)" },
         "database": { "label": "memory" },
         "security": { "label": "power + secure world" },
-        "external": { "label": "not in the device tree" }
+        "external": { "label": "off the SoC" }
       }
     }
   },
@@ -20,14 +20,15 @@
     { "id": "memory", "type": "database", "label": "DRAM", "sublabel": "~2 GB (986 + 1024 MiB)", "pos": [585, 150], "size": [190, 60] },
     { "id": "soc", "type": "backend", "label": "SoC interconnect", "sublabel": "AMBA bus, IOMMUs, clocks, ITMON", "pos": [320, 285], "size": [210, 74] },
     { "id": "multimedia", "type": "backend", "label": "Multimedia", "sublabel": "display, camera ISP, ABOX audio, MFC video", "pos": [45, 420], "size": [240, 86] },
-    { "id": "io", "type": "backend", "label": "Connectivity & I/O", "sublabel": "Wi-Fi/BT combo, USB, eMMC storage, modem/GNSS, FM", "pos": [575, 420], "size": [205, 86] },
-    { "id": "control", "type": "security", "label": "Power & secure", "sublabel": "PMU + ACPM (no PMIC chip), TEEGRIS", "pos": [325, 450], "size": [200, 72] },
-    { "id": "buses", "type": "backend", "label": "On-chip buses", "sublabel": "I2C / SPI / UART — disabled, no children", "pos": [325, 590], "size": [200, 66] },
-    { "id": "board", "type": "external", "label": "Board layer", "sublabel": "PMIC, charger, touch, sensors, camera modules, panel, NFC, codec", "pos": [315, 720], "size": [245, 84], "tag": "not in dt.img" }
+    { "id": "io", "type": "backend", "label": "I/O blocks", "sublabel": "USB, MMC, modem/GNSS RAM, SIM detect, FM", "pos": [565, 420], "size": [215, 86] },
+    { "id": "control", "type": "security", "label": "Power & secure", "sublabel": "PMU + ACPM (not PMIC chips), TEEGRIS", "pos": [325, 450], "size": [200, 72] },
+    { "id": "buses", "type": "backend", "label": "On-chip buses", "sublabel": "I2C / SPI / UART: disabled here", "pos": [315, 590], "size": [220, 66] },
+    { "id": "radio", "type": "external", "label": "Wi-Fi/BT combo", "sublabel": "node only; chip not named", "pos": [850, 426], "size": [180, 74], "tag": "off-SoC" },
+    { "id": "board", "type": "external", "label": "Board layer", "sublabel": "PMICs, charger, codec, touch, sensors, cameras, NFC", "pos": [265, 730], "size": [340, 90], "tag": "in dtbo.img" }
   ],
   "boundaries": [
-    { "kind": "security-group", "label": "Exynos 7885 SoC — all 170 device-tree nodes", "wraps": ["compute", "memory", "soc", "multimedia", "io", "control", "buses"], "pad": 18 },
-    { "kind": "region", "label": "board layer — not in dt.img (likely dtbo.img or the bootloader)", "wraps": ["board"], "pad": 14 }
+    { "kind": "security-group", "label": "Exynos SoC, base tree (dt.img) - 170 nodes with a compatible, of 430", "wraps": ["compute", "memory", "soc", "multimedia", "io", "control", "buses"], "pad": 18},
+    { "kind": "region", "label": "board layer - named by the 3 overlays in dtbo.img", "wraps": ["board"], "pad": 14}
   ],
   "connections": [
     { "from": "compute", "to": "soc", "label": "cores + GPU" },
@@ -36,12 +37,13 @@
     { "from": "soc", "to": "io", "label": "I/O + radios" },
     { "from": "soc", "to": "control", "label": "power + TEE" },
     { "from": "control", "to": "buses", "label": "controls" },
-    { "from": "buses", "to": "board", "label": "attach point — nothing described", "variant": "dashed" }
+    { "from": "io", "to": "radio", "label": "radio link", "fromSide": "right", "toSide": "left" },
+    { "from": "buses", "to": "board", "label": "overlays add children" }
   ],
   "cards": [
-    { "dot": "violet", "title": "ELI5: the chip, not the phone", "items": ["A device tree lists the hardware for the kernel", "This one lists the Exynos 7885 SoC and nothing else", "The parts bolted onto the board aren't named here", "So it describes the chip, not the whole phone"] },
-    { "dot": "emerald", "title": "What's on the SoC", "items": ["2x Cortex-A73 + 6x Cortex-A53, Mali GPU, ~2 GB RAM", "Display, camera ISP, ABOX audio, video codecs", "Wi-Fi/BT combo, USB, eMMC-style storage, modem/GNSS, FM", "Power (PMU + ACPM) and the TEEGRIS secure world"] },
-    { "dot": "rose", "title": "What's missing (the board layer)", "items": ["No PMIC, charger or fuel-gauge chip", "No touchscreen, sensors, or NFC", "No camera image sensors or display panel named", "An 8 MB keyword sweep found none of them"] },
-    { "dot": "slate", "title": "Honest limits", "items": ["Curated view; the full 170-node table is in the appendix", "dtbo.img (the likely home of board nodes) not parsed", "Buses are disabled here; children may be added at boot", "The bootloader may rewrite the memory nodes"] }
+    { "dot": "violet", "title": "ELI5: the chip, then the board", "items": ["A device tree lists the hardware for the kernel", "dt.img is the base: the SoC, no board parts", "dtbo.img holds overlays that add the board parts", "Both together describe the chip and what is around it"] },
+    { "dot": "emerald", "title": "In the base tree (dt.img)", "items": ["2x Cortex-A73 + 6x Cortex-A53, Mali GPU, ~2 GB RAM", "Display, camera ISP, ABOX audio, video codecs", "USB, MMC hosts, modem + GNSS RAM, SIM detect, FM", "Power (PMU + ACPM) and the TEEGRIS secure world"] },
+    { "dot": "amber", "title": "In the overlays (dtbo.img)", "items": ["S2MPU08 PMIC on speedy, S2MPB03 and S2DPS01 chips", "S2MU205 charger, fuel gauge, USB-PD; COD3035X codec", "Himax touch, LIS2DS, GP2AP110S, grip sensor, NFC", "Camera modules 4HA and 5E9; part roles are inferred"] },
+    { "dot": "slate", "title": "Limits", "items": ["Curated view; the 170-node table is in the appendix", "Overlays name the SoC EXYNOS7884B; dt.img says exynos7885", "The overlays turn on 19 of the 36 base-tree controllers", "The bootloader may rewrite the memory nodes (unverified)"] }
   ]
 }

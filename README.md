@@ -40,6 +40,10 @@ load `sboot.bin` raw, measure the `ADRP` page phase with `tools/phase_test.py` (
 
 all free and local: `samloader` for Samsung firmware, `lz4` / `simg2img` / `debugfs` / [`avbtool`](https://android.googlesource.com/platform/external/avb/) for unpacking, [Ghidra](https://github.com/NationalSecurityAgency/ghidra) (via [REA](https://github.com/morluto/rea)) plus [`capstone`](https://github.com/capstone-engine/capstone) for the byte-level disassembly and the phase sweep, [`binwalk`](https://github.com/ReFirmLabs/binwalk), and `checkpolicy` + [`setools`](https://github.com/SELinuxProject/setools) for the SELinux policy.
 
+## license
+
+the scripts and the write-up are GPL-3.0 - see `LICENSE`. the `.archify/` diagrams were made with [archify](https://github.com/tt-a1i/archify), and the generated pages carry its runtime and the JetBrains Mono font (OFL-1.1) under their own licenses.
+
 ---
 
 *hobby project, nothing to do with Samsung. nothing here bypasses a lock or turns one on - it's just a read of how the locks work. the reverse-engineering was Claude Code with the REA / Ghidra toolchain, and the writeup got a blind review before i called it done.*

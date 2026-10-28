@@ -198,6 +198,14 @@ One read can fool you (see above), so Claude checked the conclusion against othe
 
 So it's **identical within an Android version and across carrier vs unlocked, and different across the OS-major bump**. The plaintext `[SECLIB] Moonstone` header is the same in all four (a 16-byte field next to it changes in 2023), and the body is uniformly random (H ≈ 7.998/8). That reads as a per-OS-version secure-library stage, not a per-device secret. Whether the 2023 change is a true re-key or just a new IV on the same library can't be told from here, and "signed" is an assumption from the `SECLIB` framing, not something shown.
 
+Plotted out, the encrypted stage is obvious - it's the flat H≈8 band at the very start, before the code drops to ~6 and the two embedded AVB keys spike back to 8:
+
+![sboot.bin entropy - the encrypted [SECLIB] pre-boot blob at H about 8, the ARM64 code around 6, and the two embedded AVB RSA-4096 key copies](figures/entropy-sboot.png)
+
+And here's every partition's entropy side by side - the mostly-empty Crypto Manager with its thin encrypted bands, the high-entropy boot screens, the Shannon modem, and the tiny structured vbmeta:
+
+![A10e firmware entropy overview - sboot, cm.bin, vbmeta, param, modem and modem_debug](figures/entropy-overview.png)
+
 **4. The unlocked sibling.** The unlocked `SM-A102U1` and the carrier `SM-A102U` AT&T build (both Aug 2023) differ by ~16% (421 regions, which weren't gone through). What *does* line up matches: the AVB keys and the OEM-unlock-related code/strings (`get_oem_unlock_val`, FRP, carrierid). The clearest difference is the sales string `USA:SINGLE` (carrier) vs `USA:OPEN` (unlocked). So the evidence points to the lock being **provisioning, not a crippled bootloader** - with one catch: the unlock machinery was matched by its strings (at shifted offsets), not by diffing all 16%.
 
 **5. Samsung's own kernel source.** Samsung publishes the GPL kernel source (4.4.177, the `A102U1` release - close to, but not the same build as, the 4.4.111 binary read in Ghidra). The SELinux enforce behaviour is in there: a build-time `-DCONFIG_ALWAYS_ENFORCE=true` (from `security/selinux/Makefile`, gated on user + ship + enforce) makes `sel_write_enforce` force `enforcing`, and `RKP_KDP=y` moves the enforce flag under hypervisor protection. The source matches the mechanism in shape, not line for line. RKP, DEFEX, FIVE and PROCA source are all there, but the TIMA LKMAUTH source is withheld.

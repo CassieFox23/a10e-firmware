@@ -4,7 +4,7 @@ poking at the stock firmware on a parked **Samsung Galaxy A10e (SM-A102U)** - a 
 
 it started dumb and simple: i wanted an old phone as a pet cam for the dogs while i'm at work, running [LineageOS](https://lineageos.org) the way i'd already done on two Galaxy Tab A8s. this one wouldn't play along. turns out it's locked down in a way the tablets never were - so instead of a custom ROM i ended up reading how a modern Android phone decides what it's allowed to boot, and why a carrier-locked one is a dead end for custom ROMs.
 
-the phone, the idea and the questions are mine. the actual reverse-engineering - the disassembly, carving the keys out, the cross-build diffs - was [Claude Code](https://github.com/anthropics/claude-code) (mostly Opus, with Sonnet helpers on some side passes) driving [Ghidra](https://github.com/NationalSecurityAgency/ghidra) through the [REA](https://github.com/morluto/rea) toolkit, over two sessions. then blind reviews went over the writeup before i called it done.
+the phone, the idea and the questions are mine. the actual reverse-engineering - the disassembly, carving the keys out, the cross-build diffs - was [Claude Code](https://github.com/anthropics/claude-code) (mostly Opus, with Sonnet helpers on some side passes) driving [Ghidra](https://github.com/NationalSecurityAgency/ghidra) through the [REA](https://github.com/morluto/rea) toolkit. then blind reviews went over the writeup before i called it done.
 
 the whole shape in one picture - the locks at boot, then a [SELinux](https://github.com/SELinuxProject) fence once it's running:
 
@@ -78,7 +78,7 @@ then point the `tools/` scripts at it. derived stuff (the carved AVB key, boot s
 
 ## the method in one line
 
-load `sboot.bin` raw, measure the `ADRP` page phase with `tools/phase_test.py` (it's `0x800`, not `0`), pin the load base at `0x8ef9e800` from the absolute pointer tables (`tools/pin_base.py`), and only then does Ghidra follow the in-image pointers and resolve the AVB and Knox Guard paths to their own strings. the static read ran to **897 Ghidra operations** across the two sessions.
+load `sboot.bin` raw, measure the `ADRP` page phase with `tools/phase_test.py` (it's `0x800`, not `0`), pin the load base at `0x8ef9e800` from the absolute pointer tables (`tools/pin_base.py`), and only then does Ghidra follow the in-image pointers and resolve the AVB and Knox Guard paths to their own strings. the static read ran to several hundred Ghidra operations.
 
 the bug that made it interesting, drawn out - one wrong guess about the page phase, and how measuring it fixed everything after:
 

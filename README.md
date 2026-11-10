@@ -62,7 +62,8 @@ what's actually on the board, pulled from the device tree and its board overlays
 to run the `tools/` scripts:
 
 - python 3 - the standard library covers everything except the items below
-- the system capstone library (not `pip install capstone`), which the disassembly scripts load through `ctypes`
+- the system capstone library (not `pip install capstone`), which `pin_base.py` and `phase_test.py` load through `ctypes`
+- the python `capstone` binding, only for `sboot/pre-fix/disasm.py`
 - numpy and matplotlib for `entropy_plot.py`, matplotlib alone for `sboot_diff_chart.py`
 - `tar` and `lz4` on your PATH
 - the firmware itself, which is in the next section

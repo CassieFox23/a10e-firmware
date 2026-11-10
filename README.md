@@ -57,6 +57,18 @@ what's actually on the board, pulled from the device tree and its board overlays
 | `figures/` | the entropy plots and the cross-build change chart (made by `tools/entropy_plot.py` and `tools/sboot_diff_chart.py`) |
 | `tools/` | small Python scripts that rebuild the maps and disassembly - the ADRP phase check (`phase_test.py`), the load-base finder (`pin_base.py`; `findbase.py` is the first try, which landed on the wrong base), the partition map (`pitmap.py`), the cross-build `sboot` diff (`sboot_diff.py`), the AVB key tie (`vbmeta_key_tie.py`), and others. [`tools/README.md`](tools/README.md) says what each one takes, and `tools/sboot/pre-fix/` keeps the four old wrong-phase scripts for the record |
 
+## needs
+
+to run the `tools/` scripts:
+
+- python 3 - the standard library covers everything except the items below
+- the system capstone library (not `pip install capstone`), which the disassembly scripts load through `ctypes`
+- numpy and matplotlib for `entropy_plot.py`, matplotlib alone for `sboot_diff_chart.py`
+- `tar` and `lz4` on your PATH
+- the firmware itself, which is in the next section
+
+[`tools/README.md`](tools/README.md) says which script needs what.
+
 ## get the files
 
 the firmware bundles aren't in here - they're big and you can just redownload them. the main build is the newest one Samsung's servers still hand out for the T-Mobile A10e, so [`samloader`](https://github.com/topjohnwu/samloader-rs) grabs it without a version:
@@ -99,6 +111,14 @@ there's no Samsung firmware or code in this repo. the stock bundles came straigh
 the kernel cross-check used Samsung's own kernel source from [opensource.samsung.com](https://opensource.samsung.com) - the 4.4.177 release for the unlocked A102U1.
 
 and none of this unlocks or gets around anything on a Samsung phone. it just reads how the locks work.
+
+## help
+
+got a question, or spotted something wrong? open an issue: [github.com/CassieFox23/a10e-firmware/issues](https://github.com/CassieFox23/a10e-firmware/issues)
+
+## contributing
+
+this is a personal project. issues are welcome; pull requests aren't expected.
 
 ## license
 

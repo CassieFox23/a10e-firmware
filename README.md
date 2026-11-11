@@ -1,4 +1,4 @@
-# a10e firmware teardown
+<p align="center"><img src="docs/wordmark.png" alt="a10e firmware teardown" width="600"></p>
 
 poking at the stock firmware on a parked **Samsung Galaxy A10e (SM-A102U)** - a cheap, carrier-locked US phone i had sitting around.
 

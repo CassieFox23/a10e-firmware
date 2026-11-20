@@ -1,0 +1,33 @@
+name: Something's wrong
+description: A claim, number or address in the write-up that doesn't hold up, or a script that breaks
+labels: [bug]
+body:
+  - type: input
+    id: where
+    attributes:
+      label: Where
+      description: The file and section, or the script in `tools/`.
+      placeholder: A10e-teardown.md, the cross-checks section
+    validations:
+      required: true
+  - type: textarea
+    id: wrong
+    attributes:
+      label: What is wrong
+      description: Quote the line, or paste the script's command and its full output or traceback.
+    validations:
+      required: true
+  - type: textarea
+    id: instead
+    attributes:
+      label: What you found instead
+      description: The firmware build, the address or offset, and how you checked it. Describe where to look, don't attach Samsung files or keys.
+    validations:
+      required: true
+  - type: checkboxes
+    id: rules
+    attributes:
+      label: Before you send
+      options:
+        - label: I am not attaching Samsung firmware, extracted files or keys.
+          required: true

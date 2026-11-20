@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: A security problem
+    url: https://github.com/CassieFox23/a10e-firmware/blob/HEAD/SECURITY.md
+    about: Report it privately by the route in SECURITY.md, not here.

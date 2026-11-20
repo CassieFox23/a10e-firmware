@@ -119,7 +119,7 @@ got a question, or spotted something wrong? open an issue: [github.com/CassieFox
 
 ## contributing
 
-this is a personal project. issues are welcome; pull requests aren't expected.
+this is a personal project. issues are welcome; pull requests aren't expected. see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## license
 

@@ -1,0 +1,17 @@
+name: Question
+description: Something about the write-up or the scripts that you couldn't work out
+labels: [question]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What you read or tried first
+      description: The part of the write-up or the script you looked at, and what was unclear.
+    validations:
+      required: true

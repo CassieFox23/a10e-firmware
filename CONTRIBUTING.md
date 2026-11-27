@@ -16,4 +16,6 @@ they aren't expected, since the write-up is done and the scripts are tied to one
 
 by contributing you agree your work is released under the GPL-3.0, the same as the rest of the repo.
 
+if an AI tool helped with an issue or a fix, [AI_POLICY.md](AI_POLICY.md) says what to tell us. the notes are a best guess, and [DISCLAIMER.md](DISCLAIMER.md) says what that means for flashing.
+
 everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md).
